@@ -24,7 +24,7 @@ def load_variables_from_file():
     # make it easier for the user, you can just set all the variables in a text file.
     # Load up the notes_folder_path, original_file_ath, and gpt_log_dir variables from a text file.
 
-    with open('meeting_notes_config.txt', 'r') as file:
+    with open('meeting_notes_config.key', 'r') as file:
 
         def strip_quotes(string_in):
             # Strip quotes and new lines out of the string.

@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 openai202305/
+*.key
 
 # C extensions
 *.so

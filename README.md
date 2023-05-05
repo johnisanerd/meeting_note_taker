@@ -35,14 +35,14 @@ deactivate
 ```
 Activate it
 ```
-source /Users/johncole/Github/meeting_notes/openai202301/bin/activate
+source /Users/johncole/Github/meeting_notes/openai202305/bin/activate
 ```
 
 ### Make the VENV
 
     '''    
-    python3 -m venv openai202301
-    source openai202301/bin/activate
+    python3 -m venv openai202305
+    source openai202305/bin/activate
     pip install --upgrade pip 
     pip install -r requirements.txt
     # Check that everything installed
