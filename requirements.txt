@@ -1,0 +1,6 @@
+certifi
+openai
+python-docx
+tiktoken
+pydub
+click
