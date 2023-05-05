@@ -24,6 +24,7 @@ Translate and summarize meeting notes, using openAI.  This program runs locally 
 # Instalation Notes
 
 1. Setup a virtual environment.  Install the requirements.txt file.
+2. Copy meeting_notes_config.key.example to meeting_notes_config.key
 2. Update the three variables within the meeting_notes_config file.  
 
 ## Virtual Environment Notes
