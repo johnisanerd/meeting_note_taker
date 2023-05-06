@@ -14,7 +14,7 @@ Translate and summarize meeting notes, using openAI.  This program runs locally 
 
 1. Make this right-click deployable.
 2. Make an install script. 
-3. Consolidate functions;  This was taken from a Jupyter notebook.
+3. Consolidate functions, cleanup.
 4. Documentation
 5. Add proper logging.
 6. Analyze for mood and sentiment of the meeting.  Justify.
@@ -25,7 +25,8 @@ Translate and summarize meeting notes, using openAI.  This program runs locally 
 
 1. Setup a virtual environment.  Install the requirements.txt file.
 2. Copy meeting_notes_config.key.example to meeting_notes_config.key
-2. Update the three variables within the meeting_notes_config file.  
+2. Update the three variables within the meeting_notes_config file.
+3. Add your virtual environment folder into the .gitignore file so it doesn't sync to github.  
 
 ## Virtual Environment Notes
 

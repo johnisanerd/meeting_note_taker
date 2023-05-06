@@ -116,7 +116,7 @@ def convert_to_mp3(audio_file_path: str) -> str:
 
   return mp3_file
 
-def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output") -> list[str]:
+def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"):
     # Note we can chop these pretty small since we're going to put it all back together into a text string afterwards.
     # Convert to MP3
     mp3_file = convert_to_mp3(audio_file_path)
@@ -466,8 +466,8 @@ def main():
     print("API Key: " + api_key)
     print("GPT Log Directory: " + gpt_log_dir)
 
-    # original_file_path = input("Paste your file path:  ")
-    original_file_path = "/Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a"
+    original_file_path = input("Paste your file path:  ")
+    # original_file_path = "/Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a"
     # load the openai key into the openai api
     openai.api_key = api_key
 

@@ -1,9 +1,11 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+*.mp3
 *.py[cod]
 *$py.class
 openai202305/
 *.key
+gpt_logs/
 
 # C extensions
 *.so
