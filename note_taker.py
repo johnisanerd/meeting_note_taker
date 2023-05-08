@@ -17,8 +17,7 @@ import docx
 import datetime
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
-max_length = 3000
-
+max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
 
 def load_variables_from_file():
     # make it easier for the user, you can just set all the variables in a text file.
@@ -73,6 +72,15 @@ def check_if_file_exists(file_path: str) -> bool:
     return os.path.exists(file_path)
 
 def create_directory(notes_path, file_name):
+    """
+    Create a directory if it does not exist.
+    Parameters
+        notes_path: The path to the notes directory
+        file_name: The name of the directory to create
+    Returns 
+        directory_path: The path to the directory
+    :example: create_directory("/home/notes", "notes_1") -> "/home/notes/notes_1"
+    """
     directory_path = notes_path + "/" + file_name
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
@@ -472,7 +480,7 @@ def main():
     openai.api_key = api_key
 
     original_file_name = os.path.splitext(os.path.basename(original_file_path))[0]
-    original_file_folder_path = os.path.dirname(original_file_path)
+    # original_file_folder_path = os.path.dirname(original_file_path)
     file_folder_path = create_directory(notes_folder_path, original_file_name)
 
     subprocess.call(["cp", original_file_path, file_folder_path])
@@ -554,9 +562,8 @@ def main():
 
     # Write Transcription to File
 
-    # Get the name of the original file from file_path.  For example, if we have file_path = "/Users/johncole/Desktop/Notes/2023.04.27 - NSTC Meeting.m4a" the file name is "2023.04.27 - NSTC Meeting"
-    file_name = os.path.splitext(os.path.basename(file_path))[0]
-    file_folder_path = os.path.dirname(file_path)
+    # file_name = os.path.splitext(os.path.basename(file_path))[0]
+    # file_folder_path = os.path.dirname(file_path)
 
     # Write to file.
     full_text_transcription_path = file_folder_path + "/full_text_transcription.txt"
@@ -567,15 +574,10 @@ def main():
 
     paragraphs_out = make_paragraphs(paragraphs_in)
 
-    # Save the Transcript to Text File
-
     # Now we have a list of paragraphs.  Save it to text file.
 
     transcript_file_path = file_folder_path + "/transcript_" + file_name + ".txt"
-    print("File name: " + file_name)
-    print("File folder: " + file_folder_path)
-
-    # Save the Transcript to a text file.
+    print("Saving transcript file: " + transcript_file_path)
 
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
@@ -583,11 +585,9 @@ def main():
 
 
     consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
-
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
 
     # Save Compressed Transcript to Text File
-
     compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + file_name + ".txt"
 
     # Save the compressed transcript to a text file in the path compressed_transcript_file_path
@@ -661,24 +661,19 @@ def main():
 
         answer_list.append(answer)
 
-    # Print the Output 
-    print(answer_list)
-
     # Save the Output to a text file.
     output_file_path = file_folder_path + "/analysis_" + file_name + ".txt"
     with open(output_file_path, "w") as f:
         # write each element of answer_list to file.
         for answer in answer_list:
             f.write(answer)
-
         
-    json_file_path = output_file_path
+    # json_file_path = output_file_path
     word_doc_path = file_folder_path + "/Meeting-Notes-" + file_name + ".docx"
 
     # Open the text file up.  
     with open(output_file_path, "r") as file:
         lines = file.readlines()
-
 
     # Step 2: Create a new Word document using python-docx
     doc = docx.Document()
@@ -700,7 +695,6 @@ def main():
     header.paragraphs[0].text = header_text
 
     # Add a title page.
-
     doc.add_heading(f'Meeting Title: {file_name}', level=0)
     doc.add_heading(f'Meeting Date: ', level=1)
     doc.add_heading('Written by:  John Cole', level=1)
@@ -708,7 +702,6 @@ def main():
     doc.add_page_break()
 
     # Add the long text transcrption to the end of the document.
-
     for line in lines:
         try:
             line = line.strip()
@@ -738,5 +731,4 @@ def main():
     doc.save(word_doc_path)
 
 if __name__ == "__main__":
-    
     main()
