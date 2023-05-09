@@ -1,7 +1,7 @@
 # AI Notetaker
 # Test file:  /Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a
 
-import click
+import argparse
 import subprocess
 import os
 from pydub import AudioSegment
@@ -18,6 +18,8 @@ import datetime
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
 max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
+
+
 
 def load_variables_from_file():
     # make it easier for the user, you can just set all the variables in a text file.
@@ -152,7 +154,6 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
         return mp3_files
     else:
         return [mp3_file]
-
 
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     """Returns the number of tokens used by a list of messages."""
@@ -460,13 +461,24 @@ def compress(text_list):
         compressed_text = compressed_text + answer + "\n\n"
     return compressed_text
 
-
-
-
 #######################
 ### Main Function
 
 def main():
+
+    parser = argparse.ArgumentParser(description='AI Notetaker')
+    parser.add_argument('--file', '-f', help='File to process', default=None)
+
+    args = parser.parse_args()
+
+    if args.file:
+        if os.path.exists(args.file):
+            print("File exists: " + args.file)
+            original_file_path = args.file
+        else:
+             original_file_path = input("Paste your file path:  ")
+    else:
+        original_file_path = input("Paste your file path:  ")
 
     ### Load up variables
     notes_folder_path, api_key, gpt_log_dir = load_variables_from_file()
@@ -474,7 +486,6 @@ def main():
     print("API Key: " + api_key)
     print("GPT Log Directory: " + gpt_log_dir)
 
-    original_file_path = input("Paste your file path:  ")
     # original_file_path = "/Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a"
     # load the openai key into the openai api
     openai.api_key = api_key
