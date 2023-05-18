@@ -484,11 +484,10 @@ def compress(text_list):
 
 def main():
 
+    # Get the filename we're processing.  It can be taken in via command line, or via input after starting.  
     parser = argparse.ArgumentParser(description='AI Notetaker')
     parser.add_argument('--file', '-f', help='File to process', default=None)
-
     args = parser.parse_args()
-
     if args.file:
         if os.path.exists(args.file):
             print("File exists: " + args.file)
@@ -498,20 +497,18 @@ def main():
     else:
         original_file_path = input("Paste your file path:  ")
 
-    ### Load up variables
+    ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir = load_variables_from_file()
     print("Notes Folder Path: " + notes_folder_path)
     print("API Key: " + api_key)
     print("GPT Log Directory: " + gpt_log_dir)
-
-    # original_file_path = "/Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a"
-    # load the openai key into the openai api
     openai.api_key = api_key
 
+    # Take the filepath and make it useable.  
     original_file_name = os.path.splitext(os.path.basename(original_file_path))[0]
-    # original_file_folder_path = os.path.dirname(original_file_path)
     file_folder_path = create_directory(notes_folder_path, original_file_name)
 
+    # Copy the file to the new directory, where we'll all 
     subprocess.call(["cp", original_file_path, file_folder_path])
 
     if check_if_file_exists(file_folder_path + "/" + original_file_name + ".m4a"):
