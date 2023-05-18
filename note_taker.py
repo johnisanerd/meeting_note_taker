@@ -19,11 +19,16 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 
 max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
 
-
-
 def load_variables_from_file():
-    # make it easier for the user, you can just set all the variables in a text file.
-    # Load up the notes_folder_path, original_file_ath, and gpt_log_dir variables from a text file.
+    '''
+    Configuration variables are all set in the "meeting_config.key" file.  
+    Loads up:
+        - notes_folder_path, 
+        - gpt_log_dir, and 
+        - the api_key
+
+    Returns a tuple of strings.
+    '''
 
     with open('meeting_notes_config.key', 'r') as file:
 
@@ -101,34 +106,40 @@ def check_if_file_exists(file_path: str) -> bool:
     return os.path.exists(file_path)
 
 def convert_to_mp3(audio_file_path: str) -> str:
-  """
-  Converts the audio file to an mp3 file.
+    """
+    Converts the audio file to an mp3 file.
 
-  Args:
-    audio_file_path: The path to the audio file.
+    Args:
+        audio_file_path: The path to the audio file.
 
-  Returns:
-    A path to the mp3 file.
+    Returns:
+        A path to the mp3 file.
 
-  Raises:
-    ValueError: If the conversion failed.
-  """
-  mp3_file = 'output.mp3'
+    Raises:
+        ValueError: If the conversion failed.
+    """
+    mp3_file = 'output.mp3'
 
-  if os.path.exists(mp3_file):
-      os.remove(mp3_file)
+    if os.path.exists(mp3_file):
+        os.remove(mp3_file)
 
-  command = ['ffmpeg', '-i', audio_file_path, mp3_file]
-  subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    command = ['ffmpeg', '-i', audio_file_path, mp3_file]
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-  if not os.path.exists(mp3_file):
-      raise ValueError('Conversion to mp3 failed.  Does file really exist?')
+    if not os.path.exists(mp3_file):
+        raise ValueError('Conversion to mp3 failed.  Does file really exist?')
 
-  return mp3_file
+    return mp3_file
 
 def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"):
-    # Note we can chop these pretty small since we're going to put it all back together into a text string afterwards.
-    # Convert to MP3
+    '''
+    Note we can chop these pretty small since we're going to put it all back together into a text string afterwards.
+    Convert to MP3
+
+    Returns:
+    ---------
+        Return a list of mp3_files that were sliced up.    
+    '''
     mp3_file = convert_to_mp3(audio_file_path)
 
     # Load the MP3 into PyDub
@@ -433,8 +444,15 @@ def consolidate_list_of_strings(list, max_length=3000):
     return paragraphs
 
 def compress(text_list):
-    #  Chunkify the text into paragraphs, then sentences, then feed it to GPT3.
-    # Then return the compressed text.
+    '''
+    Chunkify the text into paragraphs, then sentences, then feed it to GPT3 for compression.
+    Then return the compressed text.
+
+    
+    Returns: 
+
+    compressed_text - str - Compressed text.
+    '''
     iter = 0
     compressed_text = ""
     for text in text_list:
@@ -634,13 +652,9 @@ def main():
     6. Make a list of keywords for search.
 
     Chat Parameters:
-
     *temperature* - What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
-
     presence_penalty - Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
-
     frequency_penalty - Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
-
     Save this all to a temporary text file.
     '''
 
