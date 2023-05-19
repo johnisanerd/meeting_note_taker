@@ -29,8 +29,10 @@ def load_variables_from_file():
 
     Returns a tuple of strings.
     '''
+    # Variable python_file_dir is the directory the python file is in
+    python_file_dir = os.path.dirname(os.path.abspath(__file__))
 
-    with open('meeting_notes_config.key', 'r') as file:
+    with open(python_file_dir+'/meeting_notes_config.key', 'r') as file:
 
         def strip_quotes(string_in):
             # Strip quotes and new lines out of the string.
