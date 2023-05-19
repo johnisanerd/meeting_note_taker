@@ -348,8 +348,21 @@ def chunkify_text(text, max_length=2000, split_string="\n\n", debug_chunkify=Fal
     return divided_text
 
 def make_paragraphs(list_of_text_chunks):
-    # Go through all the text chunks, make them into paragraphs, json.  
-    # Returns a list of paragraphs.
+    """
+    Takes a list of text chunks as input and converts them into paragraphs.
+
+    Parameters:
+    - list_of_text_chunks (list): A list containing text chunks to be organized into paragraphs.
+    
+    Returns:
+    - paragraphs (list): A list of paragraphs, where each paragraph is a string containing the organized and readable version of the original transcript.
+
+    This function loops through each text chunk in the input list and generates a prompt message that explains the task to a language model AI. The AI model is called using the `chat_with_gpt` function, passing the prompt message and the text chunk as input. The AI generates an organized and readable version of the transcript and returns it as a string.
+
+    The returned transcript is then split into a list of paragraphs using double newlines as separators, and each paragraph is appended to a list of paragraphs. 
+
+    Finally, the function returns the list of paragraphs, where each paragraph is a string containing the organized and readable version of the original transcript.
+    """
     
     count = 0
 
@@ -444,15 +457,25 @@ def consolidate_list_of_strings(list, max_length=3000):
     return paragraphs
 
 def compress(text_list):
-    '''
-    Chunkify the text into paragraphs, then sentences, then feed it to GPT3 for compression.
-    Then return the compressed text.
+    """
+    Compresses a list of text inputs using OpenAI's GPT-3 model.
 
-    
-    Returns: 
+    Args:
+        text_list (list): A list of text inputs (strings) to compress.
 
-    compressed_text - str - Compressed text.
-    '''
+    Returns:
+        str: The compressed text, as a single string.
+
+    This function chunkifies each input text into paragraphs and sentences,
+    and then sends them one by one to OpenAI's GPT-3 model for compression.
+    The compression process follows a predefined format for the input text,
+    as defined by the `transcription_messages` variable in this function.
+
+    Example usage:
+    >>> text_list = ['Lorem ipsum...', 'Duis aute...', 'Ut enim ad...']
+    >>> compressed_text = compress(text_list)
+    >>> print(compressed_text)
+    """
     iter = 0
     compressed_text = ""
     for text in text_list:
