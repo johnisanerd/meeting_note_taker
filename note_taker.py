@@ -1,9 +1,12 @@
 # AI Notetaker
 # Test file:  /Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a
 
+error_log = "/Users/johncole/Documents/GitHub/meeting_note_taker/notes_errors.log"
+
 import argparse
 import subprocess
 import os
+import sys
 from pydub import AudioSegment
 import openai
 import json
@@ -16,8 +19,47 @@ import json
 import docx
 import datetime
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+import logging
 
 max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
+
+def gen_date_time_string() -> str:
+    """
+    This function generates and returns a string representation of the current date and time in the format
+    YYYY.MM.DD-HH.MM.SS. The format is based on the format of a date and time string returned by the
+    "date" command in Linux. This function is used when generating a log file name.
+    """
+    # get current time
+    now = datetime.datetime.now()
+    # create a string from the current time
+    try:
+        datestr = now.strftime("%Y.%m.%d-%H.%M.%S")
+    except ValueError as err:
+        print("Error: ", err)
+    else:
+        return str(datestr)
+
+def say_error_out_loud():
+    """
+    This function says "Error" out loud.
+    """
+    os.system('say "Error"')
+
+## Initialize the error log, open the file.
+def initialize_error_log(error_log):
+    '''
+    This function opens the error log file for writing.
+    If the error log file does not exist, it is created.
+    If the function cannot write to the error log file, it prints an error message to the console.
+
+    Parameters:
+        error_log: The name and path of the error log file.
+
+    Returns:
+        None
+    '''
+    global error_log_file
+    error_log_file = open(error_log, 'a', encoding='utf-8-sig')
 
 def load_variables_from_file():
     '''
@@ -125,7 +167,8 @@ def convert_to_mp3(audio_file_path: str) -> str:
     if os.path.exists(mp3_file):
         os.remove(mp3_file)
 
-    command = ['ffmpeg', '-i', audio_file_path, mp3_file]
+    # command = ['ffmpeg', '-i', audio_file_path, mp3_file]
+    command = ['/usr/local/bin/ffmpeg', '-i', audio_file_path, mp3_file]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     if not os.path.exists(mp3_file):
@@ -508,6 +551,13 @@ def compress(text_list):
 ### Main Function
 
 def main():
+    logger = logging.getLogger(__name__)
+    logging.basicConfig(filename=error_log, level=logging.DEBUG)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setLevel(logging.DEBUG)
+    logger.addHandler(stdout_handler)
+
+    logger.debug("Starting!")
 
     # Get the filename we're processing.  It can be taken in via command line, or via input after starting.  
     parser = argparse.ArgumentParser(description='AI Notetaker')
@@ -515,18 +565,19 @@ def main():
     args = parser.parse_args()
     if args.file:
         if os.path.exists(args.file):
-            print("File exists: " + args.file)
+            logger.debug("File exists: " + args.file)
             original_file_path = args.file
         else:
-             original_file_path = input("Paste your file path:  ")
+            logger.debug("File does not exist: " + args.file)
+            original_file_path = input("Paste your file path:  ")
     else:
         original_file_path = input("Paste your file path:  ")
 
     ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir = load_variables_from_file()
-    print("Notes Folder Path: " + notes_folder_path)
-    print("API Key: " + api_key)
-    print("GPT Log Directory: " + gpt_log_dir)
+    logger.debug("Notes Folder Path: " + notes_folder_path)
+    logger.debug("API Key: " + api_key)
+    logger.debug("GPT Log Directory: " + gpt_log_dir)
     openai.api_key = api_key
 
     # Take the filepath and make it useable.  
@@ -537,10 +588,10 @@ def main():
     subprocess.call(["cp", original_file_path, file_folder_path])
 
     if check_if_file_exists(file_folder_path + "/" + original_file_name + ".m4a"):
-        print("File copied successfully.")
+        logger.debug("File copied successfully.")
     else:
-        print("File not copied successfully.")
-        print("Could not find file: " + file_folder_path + "/" + original_file_name + ".m4a")
+        logger.debug("File not copied successfully.")
+        logger.debug("Could not find file: " + file_folder_path + "/" + original_file_name + ".m4a")
         quit()  # don't proceed if we can't find the file.
 
     # Divide up the Audio.  Max audio size is 25 mb.
@@ -556,7 +607,7 @@ def main():
 
     output_files = convert_and_split_to_mp3(file_path)
 
-    print(f"List of output files: {output_files}")
+    logger.debug(f"List of output files: {output_files}")
 
     ## Transcribe
 
@@ -570,7 +621,7 @@ def main():
     for file in output_files:
         # Open the mp3 audio file
         count_iter = count_iter + 1
-        print("Transcribing: " + file)
+        logger.debug("Transcribing: " + file)
         # prompt_string = "This is the transcript from a business meeting.  This meeting was conducted in English."
         # prompt_string = prompt_string + f" This audio segment is part {count_iter} of {len(output_files)} parts." 
         
@@ -593,11 +644,11 @@ def main():
                 except Exception as oops:
                     retry += 1
                     if retry >= max_retry:
-                        print("Transcribe error: %s" % oops)
+                        logger.debug("Transcribe error: %s" % oops)
                         quit()
-                    print('Error transcribing:' + str(oops))
-                    print("File: " + file)
-                    print('Retrying...')
+                    logger.debug('Error transcribing:' + str(oops))
+                    logger.debug("File: " + file)
+                    logger.debug('Retrying...')
                     sleep(5)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
 
 
@@ -605,11 +656,11 @@ def main():
         with open(f"gpt_logs/{file.split('/')[-1]}.json", "w") as file:
             file.write(json.dumps(transcription))
         # Print the transcription
-        print(transcription["text"])
+        logger.debug(transcription["text"])
         full_text_of_transcription += transcription["text"]
 
-    print("Finished Transcribing.")
-    print("Full Text of Transcription:" + full_text_of_transcription)
+    logger.debug("Finished Transcribing.")
+    logger.debug("Full Text of Transcription:" + full_text_of_transcription)
 
     # Write Transcription to File
 
@@ -628,7 +679,7 @@ def main():
     # Now we have a list of paragraphs.  Save it to text file.
 
     transcript_file_path = file_folder_path + "/transcript_" + file_name + ".txt"
-    print("Saving transcript file: " + transcript_file_path)
+    logger.debug("Saving transcript file: " + transcript_file_path)
 
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
@@ -654,10 +705,10 @@ def main():
         ]
 
     tokens_used = num_tokens_from_messages(compressed_trans_list)
-    print("Compressed Transcript Tokens: " + str(tokens_used))
+    logger.debug("Compressed Transcript Tokens: " + str(tokens_used))
 
     if tokens_used > 5000:
-        print("Compressed Transcript is too long.  Splitting it up.")
+        logger.debug("Compressed Transcript is too long.  Splitting it up.")
         chunks_list = chunkify_text(compressed_transcript, max_length=4000, split_string="\n\n", debug_chunkify=False)
 
     else:
@@ -686,7 +737,7 @@ def main():
     number_of_chunks = len(chunks_list)
     for chunk in chunks_list:
         iter_num = iter_num + 1
-        print(f'Summarizing {iter_num} of {number_of_chunks}')
+        logger.debug(f'Summarizing {iter_num} of {number_of_chunks}')
 
         transcription_messages = [
             {"role": "system", "content": "As an expert assistant in analyzing business conversations, your task is to provide a comprehensive summary and analysis of a meeting transcript. "},
@@ -759,7 +810,7 @@ def main():
             else:
                 doc.add_paragraph(line)
         except:
-            print("Warning! Error in mooving through analytical lines. ")
+            logger.debug("Warning! Error in moving through analytical lines. ")
 
     # Make a new page in the document.
     doc.add_page_break()
@@ -776,6 +827,10 @@ def main():
 
     # Step 4: Save the Word document
     doc.save(word_doc_path)
+
+    print("Finished writing to word doc.  Open here: " + word_doc_path)
+
+    os.system('say "Finished processing file.  Please check!"')
 
 if __name__ == "__main__":
     main()
