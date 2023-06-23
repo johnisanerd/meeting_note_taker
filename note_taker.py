@@ -828,7 +828,7 @@ def main():
     # Step 4: Save the Word document
     doc.save(word_doc_path)
 
-    print("Finished writing to word doc.  Open here: " + word_doc_path)
+    print("Finished writing to word doc.  Open here: " + file_name)
 
     os.system('say "Finished processing file.  Please check!"')
 
