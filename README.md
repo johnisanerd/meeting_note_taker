@@ -25,7 +25,7 @@ This program summarizes the transcript of your meeting and provide some light an
 
 # Development Roadmap
 These are things to do soon!
-1. Add Recording Function. [https://realpython.com/playing-and-recording-sound-python/#recording-audio]
+1. (Add Recording Function._)[https://realpython.com/playing-and-recording-sound-python/#recording-audio]
 1. Make an install script; installs the files, makes the directories.
 2. Consolidate functions, cleanup.
 4. Add proper logging.

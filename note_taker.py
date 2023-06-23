@@ -575,9 +575,11 @@ def main():
 
     ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir = load_variables_from_file()
-    logger.debug("Notes Folder Path: " + notes_folder_path)
-    logger.debug("API Key: " + api_key)
-    logger.debug("GPT Log Directory: " + gpt_log_dir)
+    print("Notes Folder Path: " + notes_folder_path)
+    print("API Key: " + api_key)
+    print("GPT Log Directory: " + gpt_log_dir)
+
+    # load the openai key into the openai api
     openai.api_key = api_key
 
     # Take the filepath and make it useable.  
@@ -595,7 +597,6 @@ def main():
         quit()  # don't proceed if we can't find the file.
 
     # Divide up the Audio.  Max audio size is 25 mb.
-    # Get the name of the original file from file_path.  For example, if we have file_path = "/Users/johncole/Desktop/Notes/2023.04.27 - NSTC Meeting.m4a" the file name is "2023.04.27 - NSTC Meeting"
 
     file_name = original_file_name
     file_folder_path = file_folder_path
