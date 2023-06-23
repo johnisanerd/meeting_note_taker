@@ -26,13 +26,12 @@ This program summarizes the transcript of your meeting and provide some light an
 # Development Roadmap
 These are things to do soon!
 1. Make this right-click deployable.
-2. Make an install script. 
+2. Make an install script.
 3. Consolidate functions, cleanup.
-4. Documentation
+4. Documentation.
 5. Add proper logging.
 6. Analyze for mood and sentiment of the meeting.  Justify.
-7. Add in 'click' and right click capabilities.
-8. Add in keywords to the final docx.
+7. Add in keywords to the final docx.
 
 # Instalation Notes
 

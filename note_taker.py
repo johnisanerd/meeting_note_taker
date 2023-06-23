@@ -466,6 +466,7 @@ def compress(text_list):
 
 def main():
 
+    # Take the file path in as an optional argument on the command line.
     parser = argparse.ArgumentParser(description='AI Notetaker')
     parser.add_argument('--file', '-f', help='File to process', default=None)
 
@@ -486,7 +487,6 @@ def main():
     print("API Key: " + api_key)
     print("GPT Log Directory: " + gpt_log_dir)
 
-    # original_file_path = "/Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a"
     # load the openai key into the openai api
     openai.api_key = api_key
 
@@ -504,7 +504,6 @@ def main():
         quit()  # don't proceed if we can't find the file.
 
     # Divide up the Audio.  Max audio size is 25 mb.
-    # Get the name of the original file from file_path.  For example, if we have file_path = "/Users/johncole/Desktop/Notes/2023.04.27 - NSTC Meeting.m4a" the file name is "2023.04.27 - NSTC Meeting"
 
     file_name = original_file_name
     file_folder_path = file_folder_path
