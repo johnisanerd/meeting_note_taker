@@ -1,7 +1,4 @@
 # AI Notetaker
-# Test file:  /Users/johncole/Desktop/Notes/2023.05.02 - Addiction Govt Challenges.m4a
-
-error_log = "/Users/johncole/Documents/GitHub/meeting_note_taker/notes_errors.log"
 
 import argparse
 import subprocess
@@ -102,12 +99,16 @@ def load_variables_from_file():
         notes_folder_path = config_dict["notes_folder_path"]
         api_key = config_dict["api_key"]
         gpt_log_dir = config_dict["gpt_log_dir"]
+        notes_errors_log = config_dict["error_log"]
+
 
         api_key = strip_quotes(api_key)
         notes_folder_path = strip_quotes(notes_folder_path)
         gpt_log_dir = strip_quotes(gpt_log_dir)
+        errors_log = strip_quotes(notes_errors_log)
 
-        return notes_folder_path, api_key, gpt_log_dir
+
+        return notes_folder_path, api_key, gpt_log_dir, errors_log
 
 ### Shared Functions
 def check_if_file_exists(file_path: str) -> bool:
@@ -551,6 +552,15 @@ def compress(text_list):
 ### Main Function
 
 def main():
+
+    ### Load up user defined variables
+    notes_folder_path, api_key, gpt_log_dir, error_log_file = load_variables_from_file()
+    print("Notes Folder Path: " + notes_folder_path)
+    print("API Key: " + api_key)
+    print("GPT Log Directory: " + gpt_log_dir)
+    print("Error Log File: " + error_log_file)
+
+    error_log = error_log_file
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename=error_log, level=logging.DEBUG)
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -573,11 +583,7 @@ def main():
     else:
         original_file_path = input("Paste your file path:  ")
 
-    ### Load up user defined variables
-    notes_folder_path, api_key, gpt_log_dir = load_variables_from_file()
-    print("Notes Folder Path: " + notes_folder_path)
-    print("API Key: " + api_key)
-    print("GPT Log Directory: " + gpt_log_dir)
+
 
     # load the openai key into the openai api
     openai.api_key = api_key
