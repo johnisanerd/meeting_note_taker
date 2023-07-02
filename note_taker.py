@@ -660,7 +660,7 @@ def main():
 
 
         # save the raw response to file in the "gpt_logs" subfolder
-        with open(f"gpt_logs/{file.split('/')[-1]}.json", "w") as file:
+        with open(f"{gpt_log_dir}/{file.split('/')[-1]}.json", "w") as file:
             file.write(json.dumps(transcription))
         # Print the transcription
         logger.debug(transcription["text"])
