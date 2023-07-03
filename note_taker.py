@@ -449,8 +449,9 @@ def compress(text_list):
         answer = chat_with_gpt(transcription_messages, 
                                model="gpt-3.5-turbo", 
                                temperature=0.2)
-        print("Text: " + text)
-        print("Answer: " + answer)
+        # For Debugging in the Future:
+        # print("Text: " + text)
+        # print("Answer: " + answer)
         compressed_text = compressed_text + answer + "\n\n"
     return compressed_text
 
@@ -579,10 +580,8 @@ def main():
     consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
 
-    # Save Compressed Transcript to Text File
+    # Save Compressed Transcript to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
     compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + file_name + ".txt"
-
-    # Save the compressed transcript to a text file in the path compressed_transcript_file_path
     with open(compressed_transcript_file_path, "w") as f:
         f.write(compressed_transcript)
 
@@ -602,9 +601,38 @@ def main():
     else:
         chunks_list = [compressed_transcript]
 
-    # Make bullet points for each paragraph. 
+    # Make a bullet point for each paragraph.
+    bullet_points = [] # List of the bullet points
+    iter_num = 0
+    number_of_paras = len(bullet_points)
+    for paragraph in paragraphs_out:
+        iter_num = iter_num + 1
+        logger.debug(f'Bulletizing {iter_num} of {number_of_paras}')
 
-    
+        transcription_messages = [
+            {"role": "system", "content": "As an expert assistant in analyzing business conversations, your task is to provide a single bullet point summary of a paragraph from a meeting transcript. "},
+            {"role": "assistant", "content": "Once I have received the paragraph from the meeting transcript, I will summarize the paragraph into a bullet point, ensuring it remains accurate and comprehensive in covering crucial elements from the conversation. "},
+            {"role": "user", "content": "Please ensure your response focuses on accuracy and provides as many essential details as possible within these constraints while remaining thorough in its coverage of vital aspects from the conversation. "},
+            {"role": "assistant", "content": "How should the output be formatted?"},
+            {"role": "user", "content": "Return just the sentence of the bullet point summary.  Do not include any other information, label, number, or other characters other than the single sentence."},
+            {"role": "assistant", "content": "Please provide the paragraph you'd like analyzed."},
+            {"role": "user", "content": paragraph}
+        ]
+
+        answer = chat_with_gpt(transcription_messages,
+                            # Use the default.
+                            temperature=0.2,
+                            frequency_penalty=0.5,
+                            presence_penalty=0.5)
+
+        bullet_points.append(answer)
+
+
+    # Save Bullet Points to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
+    bullet_points_file_path = file_folder_path + "/bullets_" + file_name + ".txt"
+    with open(bullet_points_file_path, "w") as f:
+        for bullet_point in bullet_points:
+            f.write(bullet_point + "\n\n")
 
     # Analyze the Text
     '''
@@ -658,13 +686,13 @@ def main():
         for answer in answer_list:
             f.write(answer)
         
-    # json_file_path = output_file_path
     word_doc_path = file_folder_path + "/Meeting-Notes-" + file_name + ".docx"
 
     # Open the text file up.  
     with open(output_file_path, "r") as file:
         lines = file.readlines()
 
+    ###########################################################################
     # Step 2: Create a new Word document using python-docx
     doc = docx.Document()
 
@@ -700,6 +728,15 @@ def main():
         except:
             logger.debug("Warning! Error in moving through analytical lines. ")
 
+    ## Add in the bullet points of the meeting.
+    doc.add_page_break()
+    doc.add_heading("Detailed Bullet Points", level=1)
+    
+    logging.debug("Adding bullet points to the word doc.")
+    for bullet in bullet_points:
+        logging.debug("Adding Bullet: " + bullet)
+        doc.add_paragraph(bullet, style="List Bullet")
+
     # Make a new page in the document.
     doc.add_page_break()
     doc.add_heading("Cleaned Transcript", level=1)
@@ -716,7 +753,8 @@ def main():
     # Step 4: Save the Word document
     doc.save(word_doc_path)
 
-    logger.debug("Finished writing to word doc.  Open here: " + file_name)
+    # logger.debug("Finished writing to word doc.  Open here: " + file_name)
+    logger.debug(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
     os.system('say "Finished processing file.  Please check!"')
 

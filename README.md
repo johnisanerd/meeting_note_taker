@@ -22,22 +22,20 @@ This program summarizes the transcript of your meeting and provide some light an
 4. Make a list of questions that were asked and answered.
 5. Make a list of questions that were asked and not answered.
 6. Make a list of keywords for search.
+7. Bullet points on the meeting.  
 
 # Development Roadmap
 These are things to do soon!
-1. (Add Recording Function._)[https://realpython.com/playing-and-recording-sound-python/#recording-audio]
+1. (Add Recording Function._)[https://realpython.com/playing-and-recording-sound-python/#recording-audio] . . . can't seem to figure out how to get permalinks to Apple Voice Memos.
 1. Make an install script; installs the files, makes the directories.
-2. Consolidate functions, cleanup.
-4. Add proper logging.
 5. Analyze for mood and sentiment of the meeting.  Justify.
-6. Add in 'click' and right click capabilities.
 7. Add in keywords to the final docx.
 
 # Instalation Notes
 
 1. Setup a virtual environment.  Install the requirements.txt file.
 2. Copy meeting_notes_config.key.example to meeting_notes_config.key
-2. Update the three variables within the meeting_notes_config file.
+2. Update the four variables within the meeting_notes_config file.
 3. Add your virtual environment folder into the .gitignore file so it doesn't sync to github.
 4. Make a directory "gpt_logs"
 
