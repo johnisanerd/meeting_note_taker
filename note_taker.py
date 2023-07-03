@@ -36,12 +36,6 @@ def gen_date_time_string() -> str:
     else:
         return str(datestr)
 
-def say_error_out_loud():
-    """
-    This function says "Error" out loud.
-    """
-    os.system('say "Error"')
-
 ## Initialize the error log, open the file.
 def initialize_error_log(error_log):
     '''
@@ -65,6 +59,7 @@ def load_variables_from_file():
         - notes_folder_path, 
         - gpt_log_dir, and 
         - the api_key
+        - errors_log path
 
     Returns a tuple of strings.
     '''
@@ -101,12 +96,10 @@ def load_variables_from_file():
         gpt_log_dir = config_dict["gpt_log_dir"]
         notes_errors_log = config_dict["error_log"]
 
-
         api_key = strip_quotes(api_key)
         notes_folder_path = strip_quotes(notes_folder_path)
         gpt_log_dir = strip_quotes(gpt_log_dir)
         errors_log = strip_quotes(notes_errors_log)
-
 
         return notes_folder_path, api_key, gpt_log_dir, errors_log
 
@@ -137,18 +130,6 @@ def create_directory(notes_path, file_name):
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
     return directory_path
-
-def check_if_file_exists(file_path: str) -> bool:
-    """
-    Checks if a file exists.
-
-    Args:
-      file_path: The path to the file.
-
-    Returns:
-      True if the file exists, False otherwise.
-    """
-    return os.path.exists(file_path)
 
 def convert_to_mp3(audio_file_path: str) -> str:
     """
@@ -243,8 +224,7 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
 
-def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):
-    
+def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
     max_retry = 5
     retry = 0
     while True:
@@ -280,7 +260,6 @@ def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Huma
             print('Error communicating with OpenAI:' + str(oops))
             sleep(1)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
             #               https://platform.openai.com/docs/guides/rate-limits/what-are-the-rate-limits-for-our-api    
-
 
 def consolidate_list_of_strings(list, max_length=2000):
     '''
@@ -429,79 +408,6 @@ def make_paragraphs(list_of_text_chunks):
         paragraphs = paragraphs + list_of_answers
     return paragraphs
 
-
-def combine_items(lst, index1, index2):
-    '''
-    Combine_items(lst, index1, index2)
-    
-    Combines two items in a list.
-    
-    Parameters
-    ----------
-    lst : list
-        The list to modify.
-    index1 : int
-        The index of the first item to combine.
-    index2 : int
-        The index of the second item to combine.
-        
-    Returns
-    -------
-    list
-        The modified list.
-        
-    Examples
-    --------
-    >>> combine_items(['a', 'b', 'c'], 0, 1)
-    ['ab', 'c']
-    
-    '''
-    # combine the items
-    combined = lst[index1] + lst[index2]
-    # remove the second item
-    del lst[index2]
-    # replace the first item with the combined item
-    lst[index1] = combined
-    return lst
-
-def consolidate_list_of_strings(list, max_length=3000):
-    '''
-    This function takes a list of strings and combines any two strings that are less than the max_length.
-    Good practice to run this before running the GPT3 summarization function.  The larger text we feed GPT3,
-    the better the results.
-
-    Parameters
-    ----------
-    list : list
-        A list of strings.
-    max_length : int
-        The maximum length of a string.  If two strings are less than this length, they will be combined.
-
-    Returns
-    -------
-    list
-        A list of strings.  Any two strings that were less than the max_length have been combined.
-
-    '''
-
-    paragraphs = list
-    i = 0 # i is the iterator here.  
-    
-    while i < len(paragraphs) - 1:
-        # go through each paragraph. If the next paragraph will fit in the current paragraph, combine them.
-        current_paragraph = paragraphs[i]
-        print("Length of current paragraph: " + str(len(current_paragraph)))
-        next_paragraph = paragraphs[i + 1]
-        if len(current_paragraph) + len(next_paragraph) + 1 < max_length:
-            # if the next paragraph will fit in the current paragraph, combine them.
-            paragraphs[i] = current_paragraph + " " + next_paragraph
-            print(f"Combined paras {i}")
-            del paragraphs[i + 1]   # remove the next paragraph from the list.  We've combined it with the current paragraph.
-
-        i += 1
-    
-    return paragraphs
-
 def compress(text_list):
     """
     Compresses a list of text inputs using OpenAI's GPT-3 model.
@@ -560,6 +466,9 @@ def main():
     print("GPT Log Directory: " + gpt_log_dir)
     print("Error Log File: " + error_log_file)
 
+    # load the openai key into the openai api
+    openai.api_key = api_key
+
     error_log = error_log_file
     logger = logging.getLogger(__name__)
     logging.basicConfig(filename=error_log, level=logging.DEBUG)
@@ -569,6 +478,7 @@ def main():
 
     logger.debug("Starting!")
 
+    # This program takes in arguments from the command line.  If none are provided, it will ask for them.
     # Get the filename we're processing.  It can be taken in via command line, or via input after starting.  
     parser = argparse.ArgumentParser(description='AI Notetaker')
     parser.add_argument('--file', '-f', help='File to process', default=None)
@@ -583,18 +493,12 @@ def main():
     else:
         original_file_path = input("Paste your file path:  ")
 
-
-
-    # load the openai key into the openai api
-    openai.api_key = api_key
-
     # Take the filepath and make it useable.  
     original_file_name = os.path.splitext(os.path.basename(original_file_path))[0]
     file_folder_path = create_directory(notes_folder_path, original_file_name)
 
-    # Copy the file to the new directory, where we'll all 
+    # Copy the file to the new directory, where we're working.  Check if it copied correctly.
     subprocess.call(["cp", original_file_path, file_folder_path])
-
     if check_if_file_exists(file_folder_path + "/" + original_file_name + ".m4a"):
         logger.debug("File copied successfully.")
     else:
@@ -602,18 +506,13 @@ def main():
         logger.debug("Could not find file: " + file_folder_path + "/" + original_file_name + ".m4a")
         quit()  # don't proceed if we can't find the file.
 
-    # Divide up the Audio.  Max audio size is 25 mb.
-
+    # Divide up the Audio.  Max audio size is 25 mb.  Stick it into the working folder.  Quit if error.
     file_name = original_file_name
-    file_folder_path = file_folder_path
     file_path = file_folder_path + "/" + file_name + ".m4a"
-
     if not check_if_file_exists(file_path):
         raise ValueError(f"File {file_path} does not exist.")
         quit()
-
     output_files = convert_and_split_to_mp3(file_path)
-
     logger.debug(f"List of output files: {output_files}")
 
     ## Transcribe
@@ -622,16 +521,13 @@ def main():
     # Documentation [on transcription is here.](https://platform.openai.com/docs/api-reference/audio/create)
 
     full_text_of_transcription = ""
-
     count_iter = 0 
 
     for file in output_files:
         # Open the mp3 audio file
         count_iter = count_iter + 1
         logger.debug("Transcribing: " + file)
-        # prompt_string = "This is the transcript from a business meeting.  This meeting was conducted in English."
-        # prompt_string = prompt_string + f" This audio segment is part {count_iter} of {len(output_files)} parts." 
-        
+
         with open(file, "rb") as audio_file:
             # Transcribe the audio using the Whisper API
             
@@ -643,7 +539,6 @@ def main():
                                                 model="whisper-1", 
                                                 response_format="json",
                                                 temperature=0.2,
-                                                # prompt=prompt_string,
                                                 language="en"
                                                 )
             
@@ -658,40 +553,28 @@ def main():
                     logger.debug('Retrying...')
                     sleep(5)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
 
-
         # save the raw response to file in the "gpt_logs" subfolder
         with open(f"{gpt_log_dir}/{file.split('/')[-1]}.json", "w") as file:
             file.write(json.dumps(transcription))
         # Print the transcription
         logger.debug(transcription["text"])
         full_text_of_transcription += transcription["text"]
-
     logger.debug("Finished Transcribing.")
     logger.debug("Full Text of Transcription:" + full_text_of_transcription)
 
     # Write Transcription to File
-
-    # file_name = os.path.splitext(os.path.basename(file_path))[0]
-    # file_folder_path = os.path.dirname(file_path)
-
-    # Write to file.
     full_text_transcription_path = file_folder_path + "/full_text_transcription.txt"
     with open(full_text_transcription_path, "w") as file:
         file.write(full_text_of_transcription)
-    
     paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
-
     paragraphs_out = make_paragraphs(paragraphs_in)
 
     # Now we have a list of paragraphs.  Save it to text file.
-
     transcript_file_path = file_folder_path + "/transcript_" + file_name + ".txt"
     logger.debug("Saving transcript file: " + transcript_file_path)
-
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
             f.write(paragraph + "\n\n")
-
 
     consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
@@ -704,13 +587,11 @@ def main():
         f.write(compressed_transcript)
 
     # Rebuild the Text Lists
-
     compressed_trans_list = [
             {"role": "system", "content": "you"},
             {"role": "assistant", "content": "Send me the transcript."},
             {"role": "user", "content": compressed_transcript}
         ]
-
     tokens_used = num_tokens_from_messages(compressed_trans_list)
     logger.debug("Compressed Transcript Tokens: " + str(tokens_used))
 
@@ -721,6 +602,9 @@ def main():
     else:
         chunks_list = [compressed_transcript]
 
+    # Make bullet points for each paragraph. 
+
+    
 
     # Analyze the Text
     '''
@@ -730,6 +614,7 @@ def main():
     4. Make a list of questions that were asked and answered.
     5. Make a list of questions that were asked and not answered.
     6. Make a list of keywords for search.
+    7. Summarize a bullet point for each paragraph.  
 
     Chat Parameters:
     *temperature* - What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
@@ -788,10 +673,6 @@ def main():
     core_properties.author = 'John Cole'
     core_properties.title = f'Meeting Analysis and Notes: {file_name}'
     core_properties.subject = f'Notes'
-    # doc_keywords_string = ""
-    # for keyword in data["keywords"]:
-    #     doc_keywords_string = doc_keywords_string + keyword + ", "
-    # core_properties.keywords = f'{doc_keywords_string}'
     core_properties.category = f'Meeting Notes'
 
     # Set header information for all pages
@@ -835,7 +716,7 @@ def main():
     # Step 4: Save the Word document
     doc.save(word_doc_path)
 
-    print("Finished writing to word doc.  Open here: " + file_name)
+    logger.debug("Finished writing to word doc.  Open here: " + file_name)
 
     os.system('say "Finished processing file.  Please check!"')
 
