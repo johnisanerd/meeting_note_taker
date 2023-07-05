@@ -1,3 +1,3 @@
 #!/bin/bash
 
-/Users/johncole/Github/meeting_note_taker/openai202305/bin/python3  /Users/johncole/Github/meeting_note_taker/note_taker.py
+/Users/johncole/Documents/GitHub/meeting_note_taker/openai202305/bin/python /Users/johncole/Documents/GitHub/meeting_note_taker/note_taker.py

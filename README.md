@@ -38,6 +38,9 @@ These are things to do soon!
 2. Update the four variables within the meeting_notes_config file.
 3. Add your virtual environment folder into the .gitignore file so it doesn't sync to github.
 4. Make a directory "gpt_logs"
+5. Copy over "NoteTaker.command.example" to "NoteTaker.command"
+6. Copy over "NoteTaker.command.example" to "NoteTaker.command"
+7. Make executable with a chmod +x 
 
 ## Virtual Environment Notes
 
