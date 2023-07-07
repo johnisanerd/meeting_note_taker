@@ -33,6 +33,7 @@ These are things to do soon!
 
 # Instalation Notes
 
+0. Install portaudio `brew install portaudio`
 1. Setup a virtual environment.  Install the requirements.txt file.
 2. Copy meeting_notes_config.key.example to meeting_notes_config.key
 2. Update the four variables within the meeting_notes_config file.
