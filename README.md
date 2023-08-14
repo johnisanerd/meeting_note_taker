@@ -27,9 +27,10 @@ This program summarizes the transcript of your meeting and provide some light an
 # Development Roadmap
 These are things to do soon!
 1. (Add Recording Function._)[https://realpython.com/playing-and-recording-sound-python/#recording-audio] . . . can't seem to figure out how to get permalinks to Apple Voice Memos.
-1. Make an install script; installs the files, makes the directories.
+2. Add a beep every 5 minutes to let the user know you're still recording.  
+3. Add in keywords to the final docx.
+4. Make an install script; installs the files, makes the directories.
 5. Analyze for mood and sentiment of the meeting.  Justify.
-7. Add in keywords to the final docx.
 
 # Instalation Notes
 

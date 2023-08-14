@@ -622,8 +622,8 @@ def main():
         answer = chat_with_gpt(transcription_messages,
                             # Use the default.
                             temperature=0.2,
-                            frequency_penalty=0.5,
-                            presence_penalty=0.5)
+                            frequency_penalty=0.25,
+                            presence_penalty=0.25)
 
         bullet_points.append(answer)
 
@@ -674,8 +674,8 @@ def main():
         answer = chat_with_gpt(transcription_messages,
                             model="gpt-4",
                             temperature=0.2,
-                            frequency_penalty=0.5,
-                            presence_penalty=0.5)
+                            frequency_penalty=0.25,
+                            presence_penalty=0.25)
 
         answer_list.append(answer)
 
