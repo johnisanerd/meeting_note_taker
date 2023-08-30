@@ -132,12 +132,13 @@ def create_directory(notes_path, file_name):
         os.makedirs(directory_path)
     return directory_path
 
-def convert_to_mp3(audio_file_path: str) -> str:
+def convert_to_mp3(audio_file_path: str, bitrate: str = '128k') -> str:
     """
-    Converts the audio file to an mp3 file.
+    Converts the audio file to a mono mp3 file with a specified bitrate.
 
     Args:
         audio_file_path: The path to the audio file.
+        bitrate: The bitrate of the output mp3 file. Default is '128k'.
 
     Returns:
         A path to the mp3 file.
@@ -150,8 +151,7 @@ def convert_to_mp3(audio_file_path: str) -> str:
     if os.path.exists(mp3_file):
         os.remove(mp3_file)
 
-    # command = ['ffmpeg', '-i', audio_file_path, mp3_file]
-    command = ['/usr/local/bin/ffmpeg', '-i', audio_file_path, mp3_file]
+    command = ['/usr/local/bin/ffmpeg', '-i', audio_file_path, '-ac', '1', '-b:a', bitrate, mp3_file]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     if not os.path.exists(mp3_file):
@@ -472,6 +472,63 @@ def compress(text_list):
         compressed_text = compressed_text + answer + "\n\n"
     return compressed_text
 
+def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
+
+    ## Transcribe
+    # Output files is a list of files to be transcribed.  Returns a string of the discussiont.
+
+    # Go through each of the sound files in the list.  Open them, convert them to text, and save them to a file.  Returns the full transcript sewn together.
+    # Documentation [on transcription is here.](https://platform.openai.com/docs/api-reference/audio/create)
+
+    full_text_of_transcription = ""
+    count_iter = 0 
+
+    for file in output_files:
+        # Open the mp3 audio file
+        count_iter = count_iter + 1
+        logger.debug("Transcribing: " + file)
+
+        with open(file, "rb") as audio_file:
+            # Transcribe the audio using the Whisper API
+            
+            max_retry = 5
+            retry = 0
+            while True:
+                try:
+                    transcription = openai.Audio.transcribe(file=audio_file,
+                                                model="whisper-1", 
+                                                response_format="json",
+                                                temperature=0,
+                                                language="en"
+                                                )
+            
+                    break
+                except Exception as oops:
+                    retry += 1
+                    if retry >= max_retry:
+                        logger.debug("Transcribe error: %s" % oops)
+                        quit()
+                    logger.debug('Error transcribing:' + str(oops))
+                    logger.debug("File: " + file)
+                    logger.debug('Retrying...')
+                    sleep(5)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
+
+        # save the raw response to file in the "gpt_logs" subfolder
+        with open(f"{gpt_log_dir}/{file.split('/')[-1]}.json", "w") as file:
+            file.write(json.dumps(transcription))
+        # Print the transcription
+        logger.debug(transcription["text"])
+        full_text_of_transcription += transcription["text"]
+    logger.debug("Finished Transcribing.")
+    logger.debug("Full Text of Transcription:" + full_text_of_transcription)
+
+    # Write Transcription to File
+    full_text_transcription_path = file_folder_path + "/full_text_transcription.txt"
+    with open(full_text_transcription_path, "w") as file:
+        file.write(full_text_of_transcription)
+    
+    return full_text_of_transcription
+
 #######################
 ### Main Function
 
@@ -532,66 +589,7 @@ def main():
     output_files = convert_and_split_to_mp3(file_path)
     logger.debug(f"List of output files: {output_files}")
 
-    ## Transcribe
-
-    # Go through each of the sound files in the list.  Open them, convert them to text, and save them to a file.  Returns the full transcript sewn together.
-    # Documentation [on transcription is here.](https://platform.openai.com/docs/api-reference/audio/create)
-
-    full_text_of_transcription = ""
-    count_iter = 0 
-
-    for file in output_files:
-        # Open the mp3 audio file
-        count_iter = count_iter + 1
-        logger.debug("Transcribing: " + file)
-
-        with open(file, "rb") as audio_file:
-            # Transcribe the audio using the Whisper API
-            
-            max_retry = 5
-            retry = 0
-            while True:
-                try:
-                    transcription = openai.Audio.transcribe(file=audio_file,
-                                                model="whisper-1", 
-                                                response_format="json",
-                                                temperature=0.2,
-                                                language="en"
-                                                )
-            
-                    break
-                except Exception as oops:
-                    retry += 1
-                    if retry >= max_retry:
-                        logger.debug("Transcribe error: %s" % oops)
-                        quit()
-                    logger.debug('Error transcribing:' + str(oops))
-                    logger.debug("File: " + file)
-                    logger.debug('Retrying...')
-                    sleep(5)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
-
-        # save the raw response to file in the "gpt_logs" subfolder
-        with open(f"{gpt_log_dir}/{file.split('/')[-1]}.json", "w") as file:
-            file.write(json.dumps(transcription))
-        # Print the transcription
-        logger.debug(transcription["text"])
-        full_text_of_transcription += transcription["text"]
-    logger.debug("Finished Transcribing.")
-    logger.debug("Full Text of Transcription:" + full_text_of_transcription)
-
-    # Write Transcription to File
-    full_text_transcription_path = file_folder_path + "/full_text_transcription.txt"
-    with open(full_text_transcription_path, "w") as file:
-        file.write(full_text_of_transcription)
-    
-
-    ##############
-    # ! BEGIN!
-    
-    # full_text_transcription_path = "/Users/johncole/Desktop/Notes/2023.08.29 - Synthea - Jason W at MITRE/full_text_transcription.txt"
-    # with open(full_text_transcription_path, "r") as file:
-    #     full_text_of_transcription = file.read()
-
+    full_text_of_transcription = transcribe(output_files, file_folder_path, logger, gpt_log_dir)
     paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
     paragraphs_out = make_paragraphs(paragraphs_in)
 
@@ -618,13 +616,6 @@ def main():
         ]
     tokens_used = num_tokens_from_messages(compressed_trans_list)
     logger.debug("Compressed Transcript Tokens: " + str(tokens_used))
-
-    if tokens_used > 5000:
-        logger.debug("Compressed Transcript is too long.  Splitting it up.")
-        chunks_list = chunkify_text(compressed_transcript, max_length=4000, split_string="\n\n", debug_chunkify=False)
-
-    else:
-        chunks_list = [compressed_transcript]
 
     # Make a bullet point for each paragraph.
     bullet_points = [] # List of the bullet points
