@@ -19,6 +19,7 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import logging
 
 max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
+max_tokens = 16000      # Max tokens we can use
 
 def gen_date_time_string() -> str:
     """
@@ -193,6 +194,17 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
     else:
         return [mp3_file]
 
+def count_tokens(post_text, token_model="gpt-3.5-turbo-16k-0613"):
+    if not isinstance(post_text, list):
+        measure_message = [
+            {"role": "system", "content": f"{post_text}"},
+        ]
+    else:
+        measure_message = post_text
+
+    number_of_words = num_tokens_from_messages(measure_message, model=token_model)
+    return number_of_words
+
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     """Returns the number of tokens used by a list of messages."""
     try:
@@ -212,6 +224,9 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     elif model == "gpt-4-0314":
         tokens_per_message = 3
         tokens_per_name = 1
+    elif model == "gpt-3.5-turbo-16k-0613":
+        tokens_per_message = 4
+        tokens_per_name = -1
     else:
         raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
     num_tokens = 0
@@ -294,7 +309,6 @@ def consolidate_list_of_strings(list, max_length=2000):
         i += 1
     
     return paragraphs
-
 
 def chunkify_text(text, max_length=2000, split_string="\n\n", debug_chunkify=False):
     ''' 
@@ -402,8 +416,11 @@ def make_paragraphs(list_of_text_chunks):
             {"role": "assistant", "content": "Send me the transcript."},
             {"role": "user", "content": text}
         ]
-        
-        answer = chat_with_gpt(transcription_messages, model="gpt-3.5-turbo", temperature=0.2)
+        answer = chat_with_gpt(transcription_messages, 
+                               model="gpt-3.5-turbo-16k-0613", 
+                               frequency_penalty=0.125,
+                               presence_penalty=0.125,
+                               temperature=0.2)
         list_of_answers = answer.split("\n\n")
         paragraphs = paragraphs + list_of_answers
     return paragraphs
@@ -447,7 +464,7 @@ def compress(text_list):
         ]
         
         answer = chat_with_gpt(transcription_messages, 
-                               model="gpt-3.5-turbo", 
+                               model="gpt-3.5-turbo-16k-0613", 
                                temperature=0.2)
         # For Debugging in the Future:
         # print("Text: " + text)
@@ -459,7 +476,7 @@ def compress(text_list):
 ### Main Function
 
 def main():
-
+    
     ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir, error_log_file = load_variables_from_file()
     print("Notes Folder Path: " + notes_folder_path)
@@ -506,10 +523,9 @@ def main():
         logger.debug("File not copied successfully.")
         logger.debug("Could not find file: " + file_folder_path + "/" + original_file_name + ".m4a")
         quit()  # don't proceed if we can't find the file.
-
+    #!#!#!#!#!#!
     # Divide up the Audio.  Max audio size is 25 mb.  Stick it into the working folder.  Quit if error.
-    file_name = original_file_name
-    file_path = file_folder_path + "/" + file_name + ".m4a"
+    file_path = file_folder_path + "/" + original_file_name + ".m4a"
     if not check_if_file_exists(file_path):
         raise ValueError(f"File {file_path} does not exist.")
         quit()
@@ -567,11 +583,20 @@ def main():
     full_text_transcription_path = file_folder_path + "/full_text_transcription.txt"
     with open(full_text_transcription_path, "w") as file:
         file.write(full_text_of_transcription)
+    
+
+    ##############
+    # ! BEGIN!
+    
+    # full_text_transcription_path = "/Users/johncole/Desktop/Notes/2023.08.29 - Synthea - Jason W at MITRE/full_text_transcription.txt"
+    # with open(full_text_transcription_path, "r") as file:
+    #     full_text_of_transcription = file.read()
+
     paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
     paragraphs_out = make_paragraphs(paragraphs_in)
 
     # Now we have a list of paragraphs.  Save it to text file.
-    transcript_file_path = file_folder_path + "/transcript_" + file_name + ".txt"
+    transcript_file_path = file_folder_path + "/transcript_" + original_file_name + ".txt"
     logger.debug("Saving transcript file: " + transcript_file_path)
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
@@ -581,7 +606,7 @@ def main():
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
 
     # Save Compressed Transcript to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
-    compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + file_name + ".txt"
+    compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + original_file_name + ".txt"
     with open(compressed_transcript_file_path, "w") as f:
         f.write(compressed_transcript)
 
@@ -620,42 +645,36 @@ def main():
         ]
 
         answer = chat_with_gpt(transcription_messages,
-                            # Use the default.
+                            model="gpt-3.5-turbo-0613",
                             temperature=0.2,
                             frequency_penalty=0.25,
                             presence_penalty=0.25)
 
         bullet_points.append(answer)
 
-
     # Save Bullet Points to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
-    bullet_points_file_path = file_folder_path + "/bullets_" + file_name + ".txt"
+    bullet_points_file_path = file_folder_path + "/bullets_" + original_file_name + ".txt"
     with open(bullet_points_file_path, "w") as f:
         for bullet_point in bullet_points:
             f.write(bullet_point + "\n\n")
 
     # Analyze the Text
-    '''
-    1. Make a list of action items and due outs.
-    2. Make a list of decisions that were made.
-    3. Make a list of important topics discussed.
-    4. Make a list of questions that were asked and answered.
-    5. Make a list of questions that were asked and not answered.
-    6. Make a list of keywords for search.
-    7. Summarize a bullet point for each paragraph.  
-
-    Chat Parameters:
-    *temperature* - What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
-    presence_penalty - Number between -2.0 and 2.0. Positive values penalize new tokens based on whether they appear in the text so far, increasing the model's likelihood to talk about new topics.
-    frequency_penalty - Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
-    Save this all to a temporary text file.
-    '''
-
+ 
     answer_list = []
 
     iter_num = 0
-    number_of_chunks = len(chunks_list)
-    for chunk in chunks_list:
+
+    # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
+    full_text_transcription_tokens = count_tokens(full_text_of_transcription, token_model="gpt-3.5-turbo-16k-0613")
+    if full_text_transcription_tokens > max_tokens/2:
+        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens/2}")
+        paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
+    else:
+        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens/2}")
+        paragraphs_in = [full_text_of_transcription]
+
+    number_of_chunks = len(paragraphs_in)
+    for chunk in paragraphs_in:
         iter_num = iter_num + 1
         logger.debug(f'Summarizing {iter_num} of {number_of_chunks}')
 
@@ -672,21 +691,21 @@ def main():
         ]
 
         answer = chat_with_gpt(transcription_messages,
-                            model="gpt-4",
+                            model="gpt-3.5-turbo-16k-0613",
                             temperature=0.2,
-                            frequency_penalty=0.25,
-                            presence_penalty=0.25)
+                            frequency_penalty=0.125,
+                            presence_penalty=0.125)
 
         answer_list.append(answer)
 
     # Save the Output to a text file.
-    output_file_path = file_folder_path + "/analysis_" + file_name + ".txt"
+    output_file_path = file_folder_path + "/analysis_" + original_file_name + ".txt"
     with open(output_file_path, "w") as f:
         # write each element of answer_list to file.
         for answer in answer_list:
             f.write(answer)
         
-    word_doc_path = file_folder_path + "/Meeting-Notes-" + file_name + ".docx"
+    word_doc_path = file_folder_path + "/Meeting-Notes-" + original_file_name + ".docx"
 
     # Open the text file up.  
     with open(output_file_path, "r") as file:
@@ -699,17 +718,17 @@ def main():
     # Add Meta Data.  https://python-docx.readthedocs.io/en/latest/api/document.html#coreproperties-objects
     core_properties = doc.core_properties
     core_properties.author = 'John Cole'
-    core_properties.title = f'Meeting Analysis and Notes: {file_name}'
+    core_properties.title = f'Meeting Analysis and Notes: {original_file_name}'
     core_properties.subject = f'Notes'
     core_properties.category = f'Meeting Notes'
 
     # Set header information for all pages
     header = doc.sections[0].header
-    header_text = f'Meeting Analysis and Notes: {file_name}    Written by John Cole.  Written On: {datetime.date.today()}'
+    header_text = f'Meeting Analysis and Notes: {original_file_name}    Written by John Cole.  Written On: {datetime.date.today()}'
     header.paragraphs[0].text = header_text
 
     # Add a title page.
-    doc.add_heading(f'Meeting Title: {file_name}', level=0)
+    doc.add_heading(f'Meeting Title: {original_file_name}', level=0)
     doc.add_heading(f'Meeting Date: ', level=1)
     doc.add_heading('Written by:  John Cole', level=1)
     doc.add_heading(f'Attendees: ', level=1)
@@ -725,8 +744,8 @@ def main():
                 doc.add_paragraph(line, style="List Bullet")
             else:
                 doc.add_paragraph(line)
-        except:
-            logger.debug("Warning! Error in moving through analytical lines. ")
+        except Exception as e:
+            logger.debug(f"Warning! Error in moving through analytical lines. {e}")
 
     ## Add in the bullet points of the meeting.
     doc.add_page_break()
