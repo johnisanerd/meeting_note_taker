@@ -17,6 +17,7 @@ import docx
 import datetime
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import logging
+import shutil
 
 max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
 max_tokens = 16000      # Max tokens we can use
@@ -135,7 +136,7 @@ def create_directory(notes_path, file_name):
 def convert_to_mp3(audio_file_path: str, bitrate: str = '128k') -> str:
     """
     Converts the audio file to a mono mp3 file with a specified bitrate.
-
+    The bitrates for FFmpeg MP3 are 8, 16, 24, 32, 40, 48, 64, 80, 96, 112, 128, 160, 192, 224, 256, or 320.
     Args:
         audio_file_path: The path to the audio file.
         bitrate: The bitrate of the output mp3 file. Default is '128k'.
@@ -168,7 +169,7 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
     ---------
         Return a list of mp3_files that were sliced up.    
     '''
-    mp3_file = convert_to_mp3(audio_file_path)
+    mp3_file = convert_to_mp3(audio_file_path, bitrate='48k')
 
     # Load the MP3 into PyDub
     song = AudioSegment.from_mp3(mp3_file)
@@ -450,7 +451,7 @@ def compress(text_list):
     for text in text_list:
         # Print out our progress.
         iter += 1
-        print("Chunk: " + str(iter) + "  of " + str(len(text_list)))
+        print("Compress: " + str(iter) + "  of " + str(len(text_list)))
     
         # old_unused_prompt = "You are a helpful assistant. Remove all the filler words and false starts.  Remove any sentences that are not important to the meeting.  Remove any sentences that do not add to the meaning of the text.  Rewrite all sentences in a shorter and direct voice.  Keep all names, numbers, facts, and nouns in the final text."
         # prompt = "As a helpful assistant, your task is to revise and condense the provided meeting transcript. Your goal is to create an optimized version that retains essential information while making it easier for readers to understand and follow. Focus on creating clear and coherent sections based on themes or topics discussed during the meeting.  Please consider the following guidelines when revising: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Rewrite remaining sentences in a concise and direct manner, retaining important details such as names, numbers, facts, and nouns. 4. Maintain proper grammar and sentence structure throughout. Feel free to rephrase key points using different wording or sentence structures without altering their intended meaning. This will help make the condensed transcript engaging while still conveying accurate information. Please provide a revised version of the transcript that preserves essential information from the original but delivers it in a more efficient and clear format."
@@ -519,6 +520,7 @@ def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
         # Print the transcription
         logger.debug(transcription["text"])
         full_text_of_transcription += transcription["text"]
+
     logger.debug("Finished Transcribing.")
     logger.debug("Full Text of Transcription:" + full_text_of_transcription)
 
@@ -600,6 +602,7 @@ def main():
         for paragraph in paragraphs_out:
             f.write(paragraph + "\n\n")
 
+    '''
     consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
 
@@ -616,6 +619,7 @@ def main():
         ]
     tokens_used = num_tokens_from_messages(compressed_trans_list)
     logger.debug("Compressed Transcript Tokens: " + str(tokens_used))
+    '''
 
     # Make a bullet point for each paragraph.
     bullet_points = [] # List of the bullet points
@@ -657,12 +661,14 @@ def main():
 
     # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
     full_text_transcription_tokens = count_tokens(full_text_of_transcription, token_model="gpt-3.5-turbo-16k-0613")
-    if full_text_transcription_tokens > max_tokens/2:
-        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens/2}")
+    if full_text_transcription_tokens > (max_tokens*1/4):
+        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/4}")
         paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
     else:
-        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens/2}")
+        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/4}")
         paragraphs_in = [full_text_of_transcription]
+
+    ##### THIS IS WHERE YOUR PROBLEM STARTS FOR LONG MEETINGS.
 
     number_of_chunks = len(paragraphs_in)
     for chunk in paragraphs_in:
@@ -729,8 +735,12 @@ def main():
     for line in lines:
         try:
             line = line.strip()
-            if line.startswith("###"):
-                doc.add_heading(line[4:], level=2)
+            # if line.startswith("###"):
+            if line.startswith("###") or line.startswith("##") or line.startswith("#"):
+                # Strip the leading ##'s off
+                line.lstrip("#")
+                # doc.add_heading(line[4:], level=2)
+                doc.add_heading(line, level=2)
             elif line[0].isdigit() and line[1] == ".":
                 doc.add_paragraph(line, style="List Bullet")
             else:
@@ -749,12 +759,14 @@ def main():
 
     # Make a new page in the document.
     doc.add_page_break()
+    doc.add_page_break()
     doc.add_heading("Cleaned Transcript", level=1)
 
     for paragraph in paragraphs_out:
         doc.add_paragraph(paragraph)
 
     # Make a new page in the document.
+    doc.add_page_break()
     doc.add_page_break()
     doc.add_heading("Raw Transcript", level=1)
 
@@ -766,7 +778,7 @@ def main():
     # logger.debug("Finished writing to word doc.  Open here: " + file_name)
     logger.debug(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
-    os.system('say "Finished processing file.  Please check!"')
+    # os.system('say "Finished processing file.  Please check!"')
 
 if __name__ == "__main__":
     main()
