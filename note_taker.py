@@ -19,7 +19,9 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import logging
 import shutil
 
-max_length = 3000       # Adjust this depending on the number of tokens you have available.  3000 is the default.
+length = 0
+
+max_length = 10000      # Adjust this depending on the number of tokens you have available.  3000 is the default.
 max_tokens = 16000      # Max tokens we can use
 
 def gen_date_time_string() -> str:
@@ -133,6 +135,16 @@ def create_directory(notes_path, file_name):
         os.makedirs(directory_path)
     return directory_path
 
+
+def pydub_length(path):
+    try:
+        audio = AudioSegment.from_mp3(path)
+        length = len(audio)
+        return length
+    except Exception as e:
+        print(f"Exception: {e}")
+        return None
+
 def convert_to_mp3(audio_file_path: str, bitrate: str = '128k') -> str:
     """
     Converts the audio file to a mono mp3 file with a specified bitrate.
@@ -171,6 +183,8 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
     '''
     mp3_file = convert_to_mp3(audio_file_path, bitrate='48k')
 
+    global length 
+    length = pydub_length(mp3_file)
     # Load the MP3 into PyDub
     song = AudioSegment.from_mp3(mp3_file)
 
@@ -411,11 +425,13 @@ def make_paragraphs(list_of_text_chunks):
         # Print out our progress.
         count += 1
         print("Chunk " + str(count) + "  of " + str(len(list_of_text_chunks)))
-        prompt = "As a helpful assistant, your task is to take a raw transcript of a meeting and improve its readability and organization by separating the text into logical paragraphs. Retain and Preserve all words and sentences in their original form when you write the new one. To separate each paragraph, use double newlines (a blank line between paragraphs).  Your goal is to provide an organized version of the original transcript that enables readers to easily read the original transcript from the meeting."
+        prompt = "As a helpful assistant, your task is to take a raw transcript of a meeting and improve its readability and organization by separating the text into logical paragraphs. Retain and Preserve all words and sentences in their original form when you write the new one. To separate each paragraph, use double newlines (a blank line between paragraphs).  Your goal is to provide an organized version of the original transcript that enables readers to easily read the original transcript from the meeting.  1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. Please provide a revised version of the transcript that preserves essential information from the original.  Do not summarize or analyze the transcript."
         transcription_messages = [
             {"role": "system", "content": prompt},
             {"role": "assistant", "content": "Send me the transcript."},
-            {"role": "user", "content": text}
+            {"role": "user", "content": text},
+            {"role": "assistant", "content": "What format would you like it returned in?"},
+            {"role": "user", "content": "1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. Please provide a revised version of the transcript that preserves essential information from the original.  Do not summarize or analyze the transcript."}
         ]
         answer = chat_with_gpt(transcription_messages, 
                                model="gpt-3.5-turbo-16k-0613", 
@@ -461,15 +477,15 @@ def compress(text_list):
             {"role": "assistant", "content": "Send me part of the transcript."},
             {"role": "user", "content": text},
             {"role": "assistant", "content": "I have received the transcript.  What will I do with it?"},
-            {"role": "user", "content": "Do the following: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. 4.  Remove greetings and remove goodbyes."}
+            {"role": "user", "content": "Do the following: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. 4.  Remove greetings and remove goodbyes.  Return only the cleaned up transcript, do not include any analysis or description or niceties.  Do not include phrases like 'Sure, here is the cleaned up transcript:' or 'I apologize for the confusion. Here is the cleaned up version of the transcript:'.  Do not put quotes areound the text of your reply. Return only the text of the cleaned up transcript."}
         ]
         
         answer = chat_with_gpt(transcription_messages, 
                                model="gpt-3.5-turbo-16k-0613", 
                                temperature=0.2)
         # For Debugging in the Future:
-        # print("Text: " + text)
-        # print("Answer: " + answer)
+        print("Text: " + text)
+        print("Answer: " + answer)
         compressed_text = compressed_text + answer + "\n\n"
     return compressed_text
 
@@ -518,7 +534,7 @@ def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
         with open(f"{gpt_log_dir}/{file.split('/')[-1]}.json", "w") as file:
             file.write(json.dumps(transcription))
         # Print the transcription
-        logger.debug(transcription["text"])
+        # logger.debug(transcription["text"])
         full_text_of_transcription += transcription["text"]
 
     logger.debug("Finished Transcribing.")
@@ -582,14 +598,21 @@ def main():
         logger.debug("File not copied successfully.")
         logger.debug("Could not find file: " + file_folder_path + "/" + original_file_name + ".m4a")
         quit()  # don't proceed if we can't find the file.
+
     #!#!#!#!#!#!
     # Divide up the Audio.  Max audio size is 25 mb.  Stick it into the working folder.  Quit if error.
     file_path = file_folder_path + "/" + original_file_name + ".m4a"
+    # length = pydub_length(file_path)
+
     if not check_if_file_exists(file_path):
         raise ValueError(f"File {file_path} does not exist.")
         quit()
     output_files = convert_and_split_to_mp3(file_path)
     logger.debug(f"List of output files: {output_files}")
+
+    print(f"Length: {length}")
+    audio_length = str(int(length/(60*1000))) + ':' + str(int((length/1000)%60))
+    print(f"Duration in minutes:  {audio_length}")
 
     full_text_of_transcription = transcribe(output_files, file_folder_path, logger, gpt_log_dir)
     paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
@@ -601,7 +624,6 @@ def main():
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
             f.write(paragraph + "\n\n")
-
     '''
     consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
     compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
@@ -610,24 +632,26 @@ def main():
     compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + original_file_name + ".txt"
     with open(compressed_transcript_file_path, "w") as f:
         f.write(compressed_transcript)
-
-    # Rebuild the Text Lists
+    '''
+    '''# Rebuild the Text Lists
     compressed_trans_list = [
             {"role": "system", "content": "you"},
             {"role": "assistant", "content": "Send me the transcript."},
             {"role": "user", "content": compressed_transcript}
         ]
     tokens_used = num_tokens_from_messages(compressed_trans_list)
-    logger.debug("Compressed Transcript Tokens: " + str(tokens_used))
-    '''
+    logger.debug("Compressed Transcript Tokens: " + str(tokens_used))'''
+    
+    # compressed_paragraphs = compressed_transcript.split("\n\n")
 
     # Make a bullet point for each paragraph.
     bullet_points = [] # List of the bullet points
     iter_num = 0
-    number_of_paras = len(bullet_points)
+    # number_of_paras = len(compressed_paragraphs)
+    number_of_paras = len(paragraphs_out)
     for paragraph in paragraphs_out:
         iter_num = iter_num + 1
-        logger.debug(f'Bulletizing {iter_num} of {number_of_paras}')
+        logger.debug(f'Bulletizing {iter_num} of {number_of_paras} paragraphs.  {paragraph}')
 
         transcription_messages = [
             {"role": "system", "content": "As an expert assistant in analyzing business conversations, your task is to provide a single bullet point summary of a paragraph from a meeting transcript. "},
@@ -639,13 +663,14 @@ def main():
             {"role": "user", "content": paragraph}
         ]
 
-        answer = chat_with_gpt(transcription_messages,
+        bullet = chat_with_gpt(transcription_messages,
                             model="gpt-3.5-turbo-0613",
                             temperature=0.2,
                             frequency_penalty=0.25,
                             presence_penalty=0.25)
 
-        bullet_points.append(answer)
+        bullet_points.append(bullet)
+        logger.debug(f'Bulletized: {bullet}')
 
     # Save Bullet Points to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
     bullet_points_file_path = file_folder_path + "/bullets_" + original_file_name + ".txt"
@@ -659,16 +684,16 @@ def main():
 
     iter_num = 0
 
-    # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
-    full_text_transcription_tokens = count_tokens(full_text_of_transcription, token_model="gpt-3.5-turbo-16k-0613")
-    if full_text_transcription_tokens > (max_tokens*1/4):
-        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/4}")
-        paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
-    else:
-        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/4}")
-        paragraphs_in = [full_text_of_transcription]
+    compressed_transcript = "\n\n".join(paragraphs_out)
 
-    ##### THIS IS WHERE YOUR PROBLEM STARTS FOR LONG MEETINGS.
+    # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
+    full_text_transcription_tokens = count_tokens(compressed_transcript, token_model="gpt-3.5-turbo-16k-0613")
+    if full_text_transcription_tokens > (max_tokens*1/2):
+        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        paragraphs_in = chunkify_text(compressed_transcript, max_length=max_length, debug_chunkify=True)
+    else:
+        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        paragraphs_in = [compressed_transcript]
 
     number_of_chunks = len(paragraphs_in)
     for chunk in paragraphs_in:
@@ -729,6 +754,7 @@ def main():
     doc.add_heading(f'Meeting Date: ', level=1)
     doc.add_heading('Written by:  John Cole', level=1)
     doc.add_heading(f'Attendees: ', level=1)
+    doc.add_heading(f"Duration in minutes: {audio_length}")
     doc.add_page_break()
 
     # Add the long text transcrption to the end of the document.
@@ -738,7 +764,7 @@ def main():
             # if line.startswith("###"):
             if line.startswith("###") or line.startswith("##") or line.startswith("#"):
                 # Strip the leading ##'s off
-                line.lstrip("#")
+                line = line.lstrip("#")
                 # doc.add_heading(line[4:], level=2)
                 doc.add_heading(line, level=2)
             elif line[0].isdigit() and line[1] == ".":
@@ -778,7 +804,7 @@ def main():
     # logger.debug("Finished writing to word doc.  Open here: " + file_name)
     logger.debug(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
-    # os.system('say "Finished processing file.  Please check!"')
+    os.system('say "Finished processing file.  Please check!"')
 
 if __name__ == "__main__":
     main()
