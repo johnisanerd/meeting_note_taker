@@ -209,7 +209,7 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
     else:
         return [mp3_file]
 
-def count_tokens(post_text, token_model="gpt-3.5-turbo-16k-0613"):
+def count_tokens(post_text, token_model="gpt-4-1106-preview"):
     if not isinstance(post_text, list):
         measure_message = [
             {"role": "system", "content": f"{post_text}"},
@@ -220,7 +220,7 @@ def count_tokens(post_text, token_model="gpt-3.5-turbo-16k-0613"):
     number_of_words = num_tokens_from_messages(measure_message, model=token_model)
     return number_of_words
 
-def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
+def num_tokens_from_messages(messages, model="gpt-4-1106-preview"):
     """Returns the number of tokens used by a list of messages."""
     try:
         encoding = tiktoken.encoding_for_model(model)
@@ -242,6 +242,9 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     elif model == "gpt-3.5-turbo-16k-0613":
         tokens_per_message = 4
         tokens_per_name = -1
+    elif model == "gpt-4-1106-preview":
+        tokens_per_message = 3
+        tokens_per_name = 1
     else:
         raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
     num_tokens = 0
@@ -254,7 +257,7 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
 
-def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
+def chat_with_gpt(messages, model="gpt-4-1106-preview", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
     max_retry = 5
     retry = 0
     while True:
@@ -434,7 +437,7 @@ def make_paragraphs(list_of_text_chunks):
             {"role": "user", "content": "1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. Please provide a revised version of the transcript that preserves essential information from the original.  Do not summarize or analyze the transcript."}
         ]
         answer = chat_with_gpt(transcription_messages, 
-                               model="gpt-3.5-turbo-16k-0613", 
+                               model="gpt-4-1106-preview", 
                                frequency_penalty=0.125,
                                presence_penalty=0.125,
                                temperature=0.2)
@@ -481,7 +484,7 @@ def compress(text_list):
         ]
         
         answer = chat_with_gpt(transcription_messages, 
-                               model="gpt-3.5-turbo-16k-0613", 
+                               model="gpt-4-1106-preview", 
                                temperature=0.2)
         # For Debugging in the Future:
         print("Text: " + text)
@@ -610,9 +613,9 @@ def main():
     output_files = convert_and_split_to_mp3(file_path)
     logger.debug(f"List of output files: {output_files}")
 
-    print(f"Length: {length}")
+    logger.debug(f"Length: {length}")
     audio_length = str(int(length/(60*1000))) + ':' + str(int((length/1000)%60))
-    print(f"Duration in minutes:  {audio_length}")
+    logger.debug(f"Duration in minutes:  {audio_length}")
 
     full_text_of_transcription = transcribe(output_files, file_folder_path, logger, gpt_log_dir)
     paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
@@ -624,25 +627,6 @@ def main():
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
             f.write(paragraph + "\n\n")
-    '''
-    consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
-    compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
-
-    # Save Compressed Transcript to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
-    compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + original_file_name + ".txt"
-    with open(compressed_transcript_file_path, "w") as f:
-        f.write(compressed_transcript)
-    '''
-    '''# Rebuild the Text Lists
-    compressed_trans_list = [
-            {"role": "system", "content": "you"},
-            {"role": "assistant", "content": "Send me the transcript."},
-            {"role": "user", "content": compressed_transcript}
-        ]
-    tokens_used = num_tokens_from_messages(compressed_trans_list)
-    logger.debug("Compressed Transcript Tokens: " + str(tokens_used))'''
-    
-    # compressed_paragraphs = compressed_transcript.split("\n\n")
 
     # Make a bullet point for each paragraph.
     bullet_points = [] # List of the bullet points
@@ -664,7 +648,7 @@ def main():
         ]
 
         bullet = chat_with_gpt(transcription_messages,
-                            model="gpt-3.5-turbo-0613",
+                            model="gpt-4-1106-preview",
                             temperature=0.2,
                             frequency_penalty=0.25,
                             presence_penalty=0.25)
@@ -678,6 +662,7 @@ def main():
         for bullet_point in bullet_points:
             f.write(bullet_point + "\n\n")
 
+    #############################
     # Analyze the Text
  
     answer_list = []
@@ -687,15 +672,17 @@ def main():
     compressed_transcript = "\n\n".join(paragraphs_out)
 
     # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
-    full_text_transcription_tokens = count_tokens(compressed_transcript, token_model="gpt-3.5-turbo-16k-0613")
+    full_text_transcription_tokens = count_tokens(compressed_transcript, token_model="gpt-4-1106-preview")
     if full_text_transcription_tokens > (max_tokens*1/2):
-        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        logger.debug(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
         paragraphs_in = chunkify_text(compressed_transcript, max_length=max_length, debug_chunkify=True)
     else:
-        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        logger.debug(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
         paragraphs_in = [compressed_transcript]
 
     number_of_chunks = len(paragraphs_in)
+    logger.debug(f"Number of chunks: {number_of_chunks}")
+
     for chunk in paragraphs_in:
         iter_num = iter_num + 1
         logger.debug(f'Summarizing {iter_num} of {number_of_chunks}')
@@ -713,7 +700,7 @@ def main():
         ]
 
         answer = chat_with_gpt(transcription_messages,
-                            model="gpt-3.5-turbo-16k-0613",
+                            model="gpt-4-1106-preview",
                             temperature=0.2,
                             frequency_penalty=0.125,
                             presence_penalty=0.125)
@@ -804,7 +791,7 @@ def main():
     # logger.debug("Finished writing to word doc.  Open here: " + file_name)
     logger.debug(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
-    os.system('say "Finished processing file.  Please check!"')
+    os.system('say "Finished!"')        # Let's keep the audio up, but let's not make it so . . . intrusive.
 
 if __name__ == "__main__":
     main()
