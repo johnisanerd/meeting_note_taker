@@ -18,6 +18,3 @@ tiktoken==0.3.3
 tqdm==4.65.0
 urllib3==2.0.2
 yarl==1.9.2
-pyaudio
-pydub
-wave
