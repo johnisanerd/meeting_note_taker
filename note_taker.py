@@ -5,26 +5,30 @@ import subprocess
 import os
 import sys
 from pydub import AudioSegment
+AudioSegment.converter = '/usr/local/bin/ffmpeg'
 import openai
-import json
-import time
+# import time
 import tiktoken 
 from time import time,sleep
-import json
 import re
-import json
 import docx
 import datetime
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+# from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import logging
-import shutil
+# import shutil
+import json
 
 length = 0
 
 max_length = 10000      # Adjust this depending on the number of tokens you have available.  3000 is the default.
 max_tokens = 16000      # Max tokens we can use
 
-def gen_date_time_string() -> str:
+gpt3_model = "gpt-3.5-turbo-0613"
+gpt3_turbomodel = "gpt-3.5-turbo-16k-0613"
+
+
+
+'''def gen_date_time_string() -> str:
     """
     This function generates and returns a string representation of the current date and time in the format
     YYYY.MM.DD-HH.MM.SS. The format is based on the format of a date and time string returned by the
@@ -39,22 +43,11 @@ def gen_date_time_string() -> str:
         print("Error: ", err)
     else:
         return str(datestr)
-
+'''
 ## Initialize the error log, open the file.
-def initialize_error_log(error_log):
-    '''
-    This function opens the error log file for writing.
-    If the error log file does not exist, it is created.
-    If the function cannot write to the error log file, it prints an error message to the console.
-
-    Parameters:
-        error_log: The name and path of the error log file.
-
-    Returns:
-        None
-    '''
+'''def initialize_error_log(error_log):
     global error_log_file
-    error_log_file = open(error_log, 'a', encoding='utf-8-sig')
+    error_log_file = open(error_log, 'a', encoding='utf-8-sig')'''
 
 def load_variables_from_file():
     '''
@@ -135,8 +128,19 @@ def create_directory(notes_path, file_name):
         os.makedirs(directory_path)
     return directory_path
 
-
 def pydub_length(path):
+    """
+    Calculate the length of an audio file in milliseconds using the PyDub library.
+
+    Args:
+        path (str): The path to the audio file.
+
+    Returns:
+        int: The length of the audio file in milliseconds.
+
+    Raises:
+        Exception: If there is an error while processing the audio file.
+    """
     try:
         audio = AudioSegment.from_mp3(path)
         length = len(audio)
@@ -165,6 +169,7 @@ def convert_to_mp3(audio_file_path: str, bitrate: str = '128k') -> str:
         os.remove(mp3_file)
 
     command = ['/usr/local/bin/ffmpeg', '-i', audio_file_path, '-ac', '1', '-b:a', bitrate, mp3_file]
+    # command = ['/usr/local/Cellar/ffmpeg/5.1.2_1', '-i', audio_file_path, '-ac', '1', '-b:a', bitrate, mp3_file]
     subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     if not os.path.exists(mp3_file):
@@ -174,12 +179,37 @@ def convert_to_mp3(audio_file_path: str, bitrate: str = '128k') -> str:
 
 def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"):
     '''
-    Note we can chop these pretty small since we're going to put it all back together into a text string afterwards.
-    Convert to MP3
+    Convert the audio file to MP3 format and split it into smaller segments if necessary.
+
+    Parameters:
+    -----------
+    audio_file_path : str
+        The path to the input audio file.
+
+    output_folder : str, optional
+        The folder where the output MP3 files will be saved. Default is "output".
 
     Returns:
-    ---------
-        Return a list of mp3_files that were sliced up.    
+    --------
+    mp3_files : list of str
+        A list of paths to the MP3 files that were created. If the input audio file is smaller than 25 MB,
+        the list will contain only one element, which is the path to the converted MP3 file. If the input
+        audio file is larger than 25 MB, the list will contain multiple paths to the segmented MP3 files.
+
+    Notes:
+    ------
+    - The function first converts the input audio file to MP3 format using a specified bitrate.
+    - If the size of the resulting MP3 file is larger than 25 MB, the function splits it into 30-minute segments.
+    - The segmented MP3 files are saved in the specified output folder.
+    - The function returns a list of paths to the MP3 files that were created.
+
+    Example:
+    --------
+    audio_file_path = "/path/to/audio.wav"
+    output_folder = "output"
+    mp3_files = convert_and_split_to_mp3(audio_file_path, output_folder)
+    print(mp3_files)
+    # Output: ['/path/to/output/part_1.mp3', '/path/to/output/part_2.mp3', ...]
     '''
     mp3_file = convert_to_mp3(audio_file_path, bitrate='48k')
 
@@ -209,7 +239,18 @@ def convert_and_split_to_mp3(audio_file_path: str, output_folder: str = "output"
     else:
         return [mp3_file]
 
-def count_tokens(post_text, token_model="gpt-3.5-turbo-16k-0613"):
+def count_tokens(post_text, token_model=gpt3_turbomodel):
+    """
+    Counts the number of tokens in the given post_text using the specified token_model.
+    We use this to wrap a chat around a string, so we can run it through the model.  
+
+    Args:
+        post_text (str or list): The text or list of messages to count tokens from.
+        token_model (str, optional): The token model to use for counting tokens. Defaults to gpt3_turbomodel.
+
+    Returns:
+        int: The number of tokens in the post_text.
+    """
     if not isinstance(post_text, list):
         measure_message = [
             {"role": "system", "content": f"{post_text}"},
@@ -220,8 +261,17 @@ def count_tokens(post_text, token_model="gpt-3.5-turbo-16k-0613"):
     number_of_words = num_tokens_from_messages(measure_message, model=token_model)
     return number_of_words
 
-def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
-    """Returns the number of tokens used by a list of messages."""
+def num_tokens_from_messages(messages, model=gpt3_turbomodel):
+    """
+    Returns the number of tokens used by a list of messages.
+
+    Args:
+        messages (list): A list of messages.
+        model (str, optional): The model to use for tokenization. Defaults to gpt3_turbomodel.
+
+    Returns:
+        int: The number of tokens used by the messages.
+    """
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
@@ -234,7 +284,7 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
         print("Warning: gpt-4 may change over time. Returning num tokens assuming gpt-4-0314.")
         return num_tokens_from_messages(messages, model="gpt-4-0314")
     elif model == "gpt-3.5-turbo-0301":
-        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_message = 4  # every message follows <|im_start|>{role/name}\n{content}<|end|>\n
         tokens_per_name = -1  # if there's a name, the role is omitted
     elif model == "gpt-4-0314":
         tokens_per_message = 3
@@ -251,10 +301,25 @@ def num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301"):
             num_tokens += len(encoding.encode(value))
             if key == "name":
                 num_tokens += tokens_per_name
-    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    num_tokens += 3  # every reply is primed with <|im_start|>assistant<|im_sep|>
     return num_tokens
 
 def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
+    """
+    Chat with the GPT-3 model using OpenAI's Chat API.
+
+    Args:
+        messages (list): A list of message objects containing the conversation history.
+        model (str, optional): The model to use for chat. Defaults to "gpt-3.5-turbo".
+        temperature (float, optional): Controls the randomness of the output. Higher values make the output more random. Defaults to 0.9.
+        stop (list, optional): A list of strings that, if encountered, will stop the response generation. Defaults to [" Human:", " AI:"].
+        presence_penalty (float, optional): Controls the model's behavior to generate responses that are more or less verbose. Higher values make the output more verbose. Defaults to 0.0.
+        frequency_penalty (float, optional): Controls the model's behavior to generate responses that are more or less repetitive. Higher values make the output less repetitive. Defaults to 0.0.
+        gpt_log_dir (str, optional): The directory to store the GPT logs. Defaults to "gpt_logs/".
+
+    Returns:
+        str: The generated response from the GPT model.
+    """
     max_retry = 5
     retry = 0
     while True:
@@ -289,7 +354,7 @@ def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Huma
                 return "GPT3 error: %s" % oops
             print('Error communicating with OpenAI:' + str(oops))
             sleep(1)    #   3,000 Requests Per Minute is the limit for the API.  So, we'll wait 1 second between calls, just in case we ran into this?
-            #               https://platform.openai.com/docs/guides/rate-limits/what-are-the-rate-limits-for-our-api    
+            #               https://platform.openai.com/docs/guides/rate-limits/what-are-the-rate-limits-for-our-api
 
 def consolidate_list_of_strings(list, max_length=2000):
     '''
@@ -434,7 +499,7 @@ def make_paragraphs(list_of_text_chunks):
             {"role": "user", "content": "1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. Please provide a revised version of the transcript that preserves essential information from the original.  Do not summarize or analyze the transcript."}
         ]
         answer = chat_with_gpt(transcription_messages, 
-                               model="gpt-3.5-turbo-16k-0613", 
+                               model=gpt3_turbomodel, 
                                frequency_penalty=0.125,
                                presence_penalty=0.125,
                                temperature=0.2)
@@ -442,60 +507,27 @@ def make_paragraphs(list_of_text_chunks):
         paragraphs = paragraphs + list_of_answers
     return paragraphs
 
-def compress(text_list):
+def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
     """
-    Compresses a list of text inputs using OpenAI's GPT-3 model.
+    Transcribes the audio files in the given list and returns the full transcript.
+
+    Output files is a list of files to be transcribed.  Returns a string of the discussiont.
+
+    Go through each of the sound files in the list.  Open them, convert them to text, and save them to a file.  Returns the full transcript sewn together.
+    Documentation [on transcription is here.](https://platform.openai.com/docs/api-reference/audio/create)
 
     Args:
-        text_list (list): A list of text inputs (strings) to compress.
+        output_files (list): A list of files to be transcribed.
+        file_folder_path (str): The path to the folder where the files are located.
+        logger: The logger object used for logging.
+        gpt_log_dir (str): The path to the directory where the raw transcription responses will be saved.
 
     Returns:
-        str: The compressed text, as a single string.
+        str: The full transcript of the audio files.
 
-    This function chunkifies each input text into paragraphs and sentences,
-    and then sends them one by one to OpenAI's GPT-3 model for compression.
-    The compression process follows a predefined format for the input text,
-    as defined by the `transcription_messages` variable in this function.
-
-    Example usage:
-    >>> text_list = ['Lorem ipsum...', 'Duis aute...', 'Ut enim ad...']
-    >>> compressed_text = compress(text_list)
-    >>> print(compressed_text)
+    Raises:
+        Exception: If an error occurs during transcription and the maximum number of retries is reached.
     """
-    iter = 0
-    compressed_text = ""
-    for text in text_list:
-        # Print out our progress.
-        iter += 1
-        print("Compress: " + str(iter) + "  of " + str(len(text_list)))
-    
-        # old_unused_prompt = "You are a helpful assistant. Remove all the filler words and false starts.  Remove any sentences that are not important to the meeting.  Remove any sentences that do not add to the meaning of the text.  Rewrite all sentences in a shorter and direct voice.  Keep all names, numbers, facts, and nouns in the final text."
-        # prompt = "As a helpful assistant, your task is to revise and condense the provided meeting transcript. Your goal is to create an optimized version that retains essential information while making it easier for readers to understand and follow. Focus on creating clear and coherent sections based on themes or topics discussed during the meeting.  Please consider the following guidelines when revising: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Rewrite remaining sentences in a concise and direct manner, retaining important details such as names, numbers, facts, and nouns. 4. Maintain proper grammar and sentence structure throughout. Feel free to rephrase key points using different wording or sentence structures without altering their intended meaning. This will help make the condensed transcript engaging while still conveying accurate information. Please provide a revised version of the transcript that preserves essential information from the original but delivers it in a more efficient and clear format."
-        prompt = "As a helpful assistant, your task is to clean the meeting transcript. You will create an reduced version that retains essential information. Do the following: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. Please provide a revised version of the transcript that preserves essential information from the original.  Do not summarize or analyze the transcript."
-        transcription_messages = [
-            {"role": "system", "content": prompt},
-            {"role": "assistant", "content": "Send me part of the transcript."},
-            {"role": "user", "content": text},
-            {"role": "assistant", "content": "I have received the transcript.  What will I do with it?"},
-            {"role": "user", "content": "Do the following: 1. Remove all filler words and false starts. 2. Eliminate any sentences that are not significant or don't contribute to the overall meaning of the meeting. 3. Retain important details such as names, numbers, facts, and nouns. 4.  Remove greetings and remove goodbyes.  Return only the cleaned up transcript, do not include any analysis or description or niceties.  Do not include phrases like 'Sure, here is the cleaned up transcript:' or 'I apologize for the confusion. Here is the cleaned up version of the transcript:'.  Do not put quotes areound the text of your reply. Return only the text of the cleaned up transcript."}
-        ]
-        
-        answer = chat_with_gpt(transcription_messages, 
-                               model="gpt-3.5-turbo-16k-0613", 
-                               temperature=0.2)
-        # For Debugging in the Future:
-        print("Text: " + text)
-        print("Answer: " + answer)
-        compressed_text = compressed_text + answer + "\n\n"
-    return compressed_text
-
-def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
-
-    ## Transcribe
-    # Output files is a list of files to be transcribed.  Returns a string of the discussiont.
-
-    # Go through each of the sound files in the list.  Open them, convert them to text, and save them to a file.  Returns the full transcript sewn together.
-    # Documentation [on transcription is here.](https://platform.openai.com/docs/api-reference/audio/create)
 
     full_text_of_transcription = ""
     count_iter = 0 
@@ -554,17 +586,16 @@ def main():
     
     ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir, error_log_file = load_variables_from_file()
-    print("Notes Folder Path: " + notes_folder_path)
-    print("API Key: " + api_key)
-    print("GPT Log Directory: " + gpt_log_dir)
-    print("Error Log File: " + error_log_file)
+    logging.debug("Notes Folder Path: " + notes_folder_path)
+    logging.debug("API Key: " + api_key)
+    logging.debug("GPT Log Directory: " + gpt_log_dir)
+    logging.debug("Error Log File: " + error_log_file)
 
     # load the openai key into the openai api
     openai.api_key = api_key
 
-    error_log = error_log_file
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=error_log, level=logging.DEBUG)
+    logging.basicConfig(filename=error_log_file, level=logging.DEBUG)
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.DEBUG)
     logger.addHandler(stdout_handler)
@@ -602,7 +633,6 @@ def main():
     #!#!#!#!#!#!
     # Divide up the Audio.  Max audio size is 25 mb.  Stick it into the working folder.  Quit if error.
     file_path = file_folder_path + "/" + original_file_name + ".m4a"
-    # length = pydub_length(file_path)
 
     if not check_if_file_exists(file_path):
         raise ValueError(f"File {file_path} does not exist.")
@@ -610,12 +640,11 @@ def main():
     output_files = convert_and_split_to_mp3(file_path)
     logger.debug(f"List of output files: {output_files}")
 
-    print(f"Length: {length}")
     audio_length = str(int(length/(60*1000))) + ':' + str(int((length/1000)%60))
-    print(f"Duration in minutes:  {audio_length}")
+    print(f"Meeting length: {audio_length} minutes.")
 
     full_text_of_transcription = transcribe(output_files, file_folder_path, logger, gpt_log_dir)
-    paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=True)
+    paragraphs_in = chunkify_text(full_text_of_transcription, max_length=max_length, debug_chunkify=False)
     paragraphs_out = make_paragraphs(paragraphs_in)
 
     # Now we have a list of paragraphs.  Save it to text file.
@@ -624,34 +653,26 @@ def main():
     with open(transcript_file_path, "w") as f:
         for paragraph in paragraphs_out:
             f.write(paragraph + "\n\n")
-    '''
-    consolidated_paragraphs = consolidate_list_of_strings(paragraphs_out, max_length=3000)
-    compressed_transcript = compress(consolidated_paragraphs)        # List of the paragraphs that have been compressed.
-
-    # Save Compressed Transcript to Text File.      # Save the compressed transcript to a text file in the path compressed_transcript_file_path
-    compressed_transcript_file_path = file_folder_path + "/compressed_transcript_" + original_file_name + ".txt"
-    with open(compressed_transcript_file_path, "w") as f:
-        f.write(compressed_transcript)
-    '''
-    '''# Rebuild the Text Lists
-    compressed_trans_list = [
-            {"role": "system", "content": "you"},
-            {"role": "assistant", "content": "Send me the transcript."},
-            {"role": "user", "content": compressed_transcript}
-        ]
-    tokens_used = num_tokens_from_messages(compressed_trans_list)
-    logger.debug("Compressed Transcript Tokens: " + str(tokens_used))'''
     
-    # compressed_paragraphs = compressed_transcript.split("\n\n")
-
     # Make a bullet point for each paragraph.
     bullet_points = [] # List of the bullet points
     iter_num = 0
-    # number_of_paras = len(compressed_paragraphs)
+    
     number_of_paras = len(paragraphs_out)
     for paragraph in paragraphs_out:
         iter_num = iter_num + 1
         logger.debug(f'Bulletizing {iter_num} of {number_of_paras} paragraphs.  {paragraph}')
+
+        # Strip whitespace from the paragraph.  And if it's empty, skip it.
+        paragraph = paragraph.lstrip().rstrip()
+        if paragraph == "":
+            logger.debug("Skipping empty paragraph.")
+            continue
+
+        # Check that the paragraph is at least 10 words long.  If not, skip it.
+        if len(paragraph.split()) < 10:
+            logger.debug("Skipping paragraph with less than 10 words.")
+            continue
 
         transcription_messages = [
             {"role": "system", "content": "As an expert assistant in analyzing business conversations, your task is to provide a single bullet point summary of a paragraph from a meeting transcript. "},
@@ -664,7 +685,7 @@ def main():
         ]
 
         bullet = chat_with_gpt(transcription_messages,
-                            model="gpt-3.5-turbo-0613",
+                            model=gpt3_turbomodel,
                             temperature=0.2,
                             frequency_penalty=0.25,
                             presence_penalty=0.25)
@@ -679,23 +700,22 @@ def main():
             f.write(bullet_point + "\n\n")
 
     # Analyze the Text
- 
     answer_list = []
-
     iter_num = 0
-
     compressed_transcript = "\n\n".join(paragraphs_out)
 
-    # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.    
-    full_text_transcription_tokens = count_tokens(compressed_transcript, token_model="gpt-3.5-turbo-16k-0613")
+    # Check the length and number of words of the full transcript.  If you can squeeze it into 1/2 of 16k, analyze it in one shot.  If not, chunk it up.
+    full_text_transcription_tokens = count_tokens(compressed_transcript, token_model=gpt3_turbomodel)
     if full_text_transcription_tokens > (max_tokens*1/2):
-        print(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
-        paragraphs_in = chunkify_text(compressed_transcript, max_length=max_length, debug_chunkify=True)
+        logging.debug(f"Full text needs to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        paragraphs_in = chunkify_text(compressed_transcript, max_length=max_length, debug_chunkify=False)
     else:
-        print(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
+        logging.debug(f"Full text does NOT need to be chunkified!  Full Text is {full_text_transcription_tokens} out of {max_tokens*1/2}")
         paragraphs_in = [compressed_transcript]
 
     number_of_chunks = len(paragraphs_in)
+
+    # [ ] Here's where there's a problem.  If we have a long meeting, we'll get multiple summaries.  We need to get this down to one summary.
     for chunk in paragraphs_in:
         iter_num = iter_num + 1
         logger.debug(f'Summarizing {iter_num} of {number_of_chunks}')
@@ -713,7 +733,7 @@ def main():
         ]
 
         answer = chat_with_gpt(transcription_messages,
-                            model="gpt-3.5-turbo-16k-0613",
+                            model=gpt3_turbomodel,
                             temperature=0.2,
                             frequency_penalty=0.125,
                             presence_penalty=0.125)
@@ -765,8 +785,8 @@ def main():
             if line.startswith("###") or line.startswith("##") or line.startswith("#"):
                 # Strip the leading ##'s off
                 line = line.lstrip("#")
-                # doc.add_heading(line[4:], level=2)
                 doc.add_heading(line, level=2)
+
             elif line[0].isdigit() and line[1] == ".":
                 doc.add_paragraph(line, style="List Bullet")
             else:
@@ -802,7 +822,7 @@ def main():
     doc.save(word_doc_path)
 
     # logger.debug("Finished writing to word doc.  Open here: " + file_name)
-    logger.debug(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
+    logger.info(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
     os.system('say "Finished processing file.  Please check!"')
 
