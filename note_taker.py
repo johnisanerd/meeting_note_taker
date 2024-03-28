@@ -617,8 +617,14 @@ def main():
     else:
         original_file_path = input("Paste your file path:  ")
 
+    # Rewrite the file name to convert special characters like "\ " to " "
+    original_file_path = original_file_path.replace("\\ ", " ")
+    original_file_path = original_file_path.lstrip().rstrip()
+    print(f"File Path: {original_file_path}")
+
     # Take the filepath and make it useable.  
     original_file_name = os.path.splitext(os.path.basename(original_file_path))[0]
+
     file_folder_path = create_directory(notes_folder_path, original_file_name)
 
     # Copy the file to the new directory, where we're working.  Check if it copied correctly.
