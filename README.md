@@ -10,7 +10,7 @@ The general format for calling from the command line is:
 
 For example:
 
-`python3 note_taker.py -f "/private/var/folders/jy/fqc1n18x00n2r4qhmp94lr3w0000gn/T/com.apple.VoiceMemos/.com.apple.uikit.itemprovider.temporary.SW8bHY/2023.05.08 - Synthea Handoff.m4a"`
+`python3 note_taker.py -f "/private/var/folders/jy/fn/T/com.apple.VoiceMemos/.com.apple.uikit.itemprovider.temporary.SW8bHY/2023.05.08 Handoff.m4a"`
 
 ## Features
 
