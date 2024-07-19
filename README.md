@@ -30,7 +30,7 @@ These are things to do soon!
 2. Make an install script; installs the files, makes the directories.
 3. Analyze for mood and sentiment of the meeting.  Justify.
 
-# Instalation Notes
+# Installation Notes
 
 0. Install portaudio `brew install portaudio`
 1. Setup a virtual environment.  Install the requirements.txt file.
