@@ -20,12 +20,13 @@ import json
 
 length = 0
 
-max_length = 10000      # Adjust this depending on the number of tokens you have available.  3000 is the default.
-max_tokens = 16000      # Max tokens we can use
+max_length = 20000      # Can be higher since GPT-4 Turbo has 128k context window
+max_tokens = 128000     # GPT-4 Turbo's maximum token limit
 
-gpt3_model = "gpt-3.5-turbo-0613"
-gpt3_turbomodel = "gpt-3.5-turbo-16k-0613"
-
+# gpt3_model = "gpt-3.5-turbo-0613"
+# gpt3_turbomodel = "gpt-3.5-turbo-16k-0613"
+gpt3_model = "gpt-4o-mini"
+gpt3_turbomodel = "gpt-4o-mini"
 
 
 '''def gen_date_time_string() -> str:
@@ -277,6 +278,7 @@ def num_tokens_from_messages(messages, model=gpt3_turbomodel):
     except KeyError:
         print("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
+    
     if model == "gpt-3.5-turbo":
         print("Warning: gpt-3.5-turbo may change over time. Returning num tokens assuming gpt-3.5-turbo-0301.")
         return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0301")
@@ -292,6 +294,9 @@ def num_tokens_from_messages(messages, model=gpt3_turbomodel):
     elif model == "gpt-3.5-turbo-16k-0613":
         tokens_per_message = 4
         tokens_per_name = -1
+    elif model == "gpt-4o-mini":
+        tokens_per_message = 3
+        tokens_per_name = 1
     else:
         raise NotImplementedError(f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens.""")
     num_tokens = 0
@@ -304,7 +309,7 @@ def num_tokens_from_messages(messages, model=gpt3_turbomodel):
     num_tokens += 3  # every reply is primed with <|im_start|>assistant<|im_sep|>
     return num_tokens
 
-def chat_with_gpt(messages, model="gpt-3.5-turbo", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
+def chat_with_gpt(messages, model="gpt-4o-mini", temperature=0.9, stop=[" Human:", " AI:"], presence_penalty=0.0, frequency_penalty=0.0, gpt_log_dir="gpt_logs/"):   
     """
     Chat with the GPT-3 model using OpenAI's Chat API.
 
@@ -579,6 +584,60 @@ def transcribe(output_files, file_folder_path, logger, gpt_log_dir):
     
     return full_text_of_transcription
 
+def setup_logging(log_file="notes_taker.log", debug_log=False, delete_log=True):
+    '''
+    Sets up the logger.  This will log to the console and to a file.
+
+    Args:
+        log_file (str): The name of the log file.  We will automatically assign it to a path.
+        debug_log (bool): If True, the logger will log debug messages.
+        delete_log (bool): If True, the log file will be deleted before logging.
+    '''
+    # Create logs directory if it doesn't exist
+    os.makedirs("logs", exist_ok=True)
+
+    # Log files always go in /logs
+    log_file = "logs/" + log_file
+
+    print(f"Initiating Logging: {setup_logging.__name__}")
+    print(f"Log file: {log_file}")
+    print(f"Debug log: {debug_log}")
+    print(f"Delete log: {delete_log}")
+
+    # Delete the log files if delete_log is True
+    if delete_log:
+        for file in [log_file, log_file.replace(".log", "_debug.log")]:
+            if os.path.exists(file):
+                os.remove(file)
+    
+    # Configure root logger
+    logging.getLogger().setLevel(logging.DEBUG)
+    
+    log_format = "%(asctime)s - %(levelname)s - %(message)s" # Excludes logger name.
+    formatter = logging.Formatter(log_format)
+    
+    # Configure file handler for INFO and above
+    file_handler = logging.FileHandler(log_file, mode="a")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(formatter)
+    
+    # Configure console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    
+    # Configure file handler for DEBUG and above
+    if debug_log:
+        debug_file_handler = logging.FileHandler(log_file.replace(".log", "_debug.log"), mode="a")
+        debug_file_handler.setLevel(logging.DEBUG)
+        debug_file_handler.setFormatter(formatter)
+        
+    # Add handlers to the root logger
+    logging.getLogger().addHandler(file_handler)
+    logging.getLogger().addHandler(console_handler)
+    if debug_log:
+        logging.getLogger().addHandler(debug_file_handler)
+
 #######################
 ### Main Function
 
@@ -586,19 +645,21 @@ def main():
     
     ### Load up user defined variables
     notes_folder_path, api_key, gpt_log_dir, error_log_file = load_variables_from_file()
-    logging.debug("Notes Folder Path: " + notes_folder_path)
-    logging.debug("API Key: " + api_key)
-    logging.debug("GPT Log Directory: " + gpt_log_dir)
-    logging.debug("Error Log File: " + error_log_file)
 
     # load the openai key into the openai api
     openai.api_key = api_key
 
     logger = logging.getLogger(__name__)
-    logging.basicConfig(filename=error_log_file, level=logging.DEBUG)
+    """logging.basicConfig(filename=error_log_file, level=logging.DEBUG)
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(logging.DEBUG)
-    logger.addHandler(stdout_handler)
+    logger.addHandler(stdout_handler)"""
+    setup_logging(debug_log=True, delete_log=True)
+
+    logging.debug("Notes Folder Path: " + notes_folder_path)
+    logging.debug("API Key: " + api_key)
+    logging.debug("GPT Log Directory: " + gpt_log_dir)
+    logging.debug("Error Log File: " + error_log_file)
 
     logger.debug("Starting!")
 
@@ -642,7 +703,7 @@ def main():
 
     if not check_if_file_exists(file_path):
         raise ValueError(f"File {file_path} does not exist.")
-        quit()
+
     output_files = convert_and_split_to_mp3(file_path)
     logger.debug(f"List of output files: {output_files}")
 
@@ -827,7 +888,7 @@ def main():
     # Step 4: Save the Word document
     doc.save(word_doc_path)
 
-    # logger.debug("Finished writing to word doc.  Open here: " + file_name)
+
     logger.info(f"Finished writing to word doc.  Open here: \n \"{word_doc_path}\"")
 
     os.system('say "Finished processing file.  Please check!"')
